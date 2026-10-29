@@ -40,11 +40,22 @@ one app or all.
 ComfyUI models go in `models/comfyui/<type>/` (e.g. checkpoints from Civitai in
 `models/comfyui/checkpoints`, LoRAs in `models/comfyui/loras`); press R in the UI to rescan.
 
-ComfyUI comes with two workflows (`recipes/comfyui/workflows`, copied into its workflow
-list on first start; your edits are kept): **Prompt to Image Generation WF** (Z-Image
-Turbo) and **checkpoint_workflow** (SDXL with face swap and pose variations). The models
-they use are pinned in `recipes/comfyui/recipe.sh` (`APP_MODELS`) and downloaded with the
-app. Before running checkpoint_workflow, upload a face photo in its **Load Image** nodes.
+ComfyUI comes with these workflows (`recipes/comfyui/workflows`, copied into its
+workflow list on first start; your edits are kept):
+
+- **1 - Character creation**: a name, the body and the clothes in separate boxes, and a
+  face photo; makes a full-body picture of that character, saved as
+  `outputs/comfyui/characters/<name>`.
+- **2 - Pose scene**: two characters' images (Model 1 on the left, Model 2 on the right),
+  what they do and the camera angle; each keeps their look and face. Optionally copies the
+  poses from a reference photo (switch on the green group). Makes two variations per run
+  in `outputs/comfyui/scenes/<name1>_<name2>`: two people touching often blend
+  together, so pick the best or run again.
+- **Prompt to Image Generation WF** (Z-Image Turbo) and **checkpoint_workflow** (SDXL
+  with face swap and a pose variation section).
+
+The models they use are pinned in `recipes/comfyui/recipe.sh` (`APP_MODELS`) and
+downloaded with the app. Upload your own photos in their **Load Image** nodes first.
 
 ComfyUI comes with the ReActor face swap nodes (`ReActor 🌌 Fast Face Swap`): connect a
 generated image to `input_image` and a photo of the face to use (a **Load Image** node)
