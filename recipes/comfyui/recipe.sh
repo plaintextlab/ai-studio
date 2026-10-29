@@ -34,7 +34,7 @@ comfyui-controlnet-aux Fannovel16/comfyui_controlnet_aux a587a4c1594524c1d2de5cd
 
 # Models the bundled workflows (recipes/comfyui/workflows) need, downloaded on install
 # or on the first start: "path url sha256" per line, path under models/comfyui (about
-# 35 GB in all). Models used through a node (ReActor face restore and analysis, DWPose)
+# 37 GB in all). Models used through a node (ReActor face restore and analysis, DWPose)
 # download themselves on first use; inswapper does not, so it is listed here.
 HF="https://huggingface.co"
 APP_MODELS="
@@ -48,6 +48,7 @@ ipadapter/ip-adapter-plus_sdxl_vit-h.safetensors $HF/h94/IP-Adapter/resolve/main
 ipadapter/ip-adapter-plus_sd15.safetensors $HF/h94/IP-Adapter/resolve/main/models/ip-adapter-plus_sd15.safetensors a1c250be40455cc61a43da1201ec3f1edaea71214865fb47f57927e06cbe4996
 controlnet/controlnet-openpose-sdxl-1.0.safetensors $HF/xinsir/controlnet-openpose-sdxl-1.0/resolve/main/diffusion_pytorch_model.safetensors b8524e557a7df60d081f5d4a0eb109967d107df217943bf88c2d99b9ebcc06c5
 controlnet/control_v11p_sd15_openpose_fp16.safetensors $HF/comfyanonymous/ControlNet-v1-1_fp16_safetensors/resolve/main/control_v11p_sd15_openpose_fp16.safetensors 4003c1da17b0e4ba444e02140e1c0d83bb24b79e4dcfd613c3a554d38f0f89c7
+model_patches/Z-Image-Turbo-Fun-Controlnet-Union-2.1-lite-2602-8steps.safetensors $HF/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Turbo-Fun-Controlnet-Union-2.1-lite-2602-8steps.safetensors 3ea098db9bd145be525c7e2366920b6d76c5ffd46b3d7aa8169bbc943fdaee35
 "
 
 # Arguments for launch.py (passed on to main.py), one per line.
