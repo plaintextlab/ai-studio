@@ -45,7 +45,7 @@ workflow list on first start; your edits are kept):
 
 - **1 - Character creation**: a name, the body and the clothes in separate boxes, and a
   face photo; makes a full-body picture of that character, saved as
-  `outputs/comfyui/characters/<name>`.
+  `outputs/comfyui/models/<name>`.
 - **2 - Pose scene**: two characters (Model 1 on the left, Model 2 on the right), each
   with their image (for the face) and a description of body and clothes (paste it from
   Character creation), plus what they do and the camera angle. Z-Image Turbo draws the
@@ -54,7 +54,7 @@ workflow list on first start; your edits are kept):
   main people are the largest faces, so people in the background keep theirs; set a
   model's swap to no to keep a generated face). Optionally copies the poses from a reference photo
   (switch on the green group; Z-Image's pose ControlNet). Makes two variations per run in
-  `outputs/comfyui/scenes/<name1>_<name2>`.
+  `outputs/comfyui/pose_scenes/<name1>_<name2>`.
 - **Prompt to Image Generation WF** (Z-Image Turbo) and **checkpoint_workflow** (SDXL
   with face swap and a pose variation section).
 

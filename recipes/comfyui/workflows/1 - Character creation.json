@@ -20,7 +20,7 @@
    "outputs": [],
    "properties": {},
    "widgets_values": [
-    "1. Give the character a name, describe the body and the clothes.\n2. Upload a clear photo of the face in 'Face'.\n3. Queue. The image is saved as outputs/comfyui/characters/<Name>_00001_.png\n\nThe framing (full body, front view, plain background) is fixed so the image works well as the character's reference in the 'Pose scene' workflow.\nChange the seed for a different variation of the same description."
+    "1. Give the character a name, describe the body and the clothes.\n2. Upload a clear photo of the face in 'Face'.\n3. Queue. The image is saved as outputs/comfyui/models/<Name>_00001_.png\n\nThe framing (full body, front view, plain background) is fixed so the image works well as the character's reference in the 'Pose scene' workflow.\nChange the seed for a different variation of the same description."
    ],
    "title": "How to use",
    "color": "#432",
@@ -342,7 +342,7 @@
    },
    "title": "File name",
    "widgets_values": [
-    "characters/",
+    "models/",
     "",
     ""
    ]
@@ -768,7 +768,7 @@
    },
    "title": "Character",
    "widgets_values": [
-    "characters/character"
+    "models/model"
    ]
   }
  ],
