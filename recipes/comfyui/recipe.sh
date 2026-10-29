@@ -32,6 +32,24 @@ comfyui-ipadapter-plus cubiq/ComfyUI_IPAdapter_plus a0f451a5113cf9becb0847b92884
 comfyui-controlnet-aux Fannovel16/comfyui_controlnet_aux a587a4c1594524c1d2de5cd1a86cd868ff448e1c a8a0e95ee92bafd60c9aa7f89a9cbf8b1a08c3c5da23caf1a7868f76d20406f3
 "
 
+# Models the bundled workflows (recipes/comfyui/workflows) need, downloaded on install
+# or on the first start: "path url sha256" per line, path under models/comfyui (about
+# 35 GB in all). Models used through a node (ReActor face restore and analysis, DWPose)
+# download themselves on first use; inswapper does not, so it is listed here.
+HF="https://huggingface.co"
+APP_MODELS="
+checkpoints/sd_xl_base_1.0.safetensors $HF/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors 31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b
+diffusion_models/z_image_turbo_bf16.safetensors $HF/Comfy-Org/Z-Image-Turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors 2407613050b809ffdff18a4ac99af83ea6b95443ecebdf80e064a79c825574a6
+text_encoders/qwen_3_4b.safetensors $HF/Comfy-Org/Z-Image-Turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors 6c671498573ac2f7a5501502ccce8d2b08ea6ca2f661c458e708f36b36edfc5a
+vae/ae.safetensors $HF/Comfy-Org/Z-Image-Turbo/resolve/main/split_files/vae/ae.safetensors afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38
+insightface/inswapper_128.onnx $HF/datasets/Gourieff/ReActor/resolve/main/models/inswapper_128.onnx e4a3f08c753cb72d04e10aa0f7dbe3deebbf39567d4ead6dce08e98aa49e16af
+clip_vision/CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors $HF/h94/IP-Adapter/resolve/main/models/image_encoder/model.safetensors 6ca9667da1ca9e0b0f75e46bb030f7e011f44f86cbfb8d5a36590fcd7507b030
+ipadapter/ip-adapter-plus_sdxl_vit-h.safetensors $HF/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors 3f5062b8400c94b7159665b21ba5c62acdcd7682262743d7f2aefedef00e6581
+ipadapter/ip-adapter-plus_sd15.safetensors $HF/h94/IP-Adapter/resolve/main/models/ip-adapter-plus_sd15.safetensors a1c250be40455cc61a43da1201ec3f1edaea71214865fb47f57927e06cbe4996
+controlnet/controlnet-openpose-sdxl-1.0.safetensors $HF/xinsir/controlnet-openpose-sdxl-1.0/resolve/main/diffusion_pytorch_model.safetensors b8524e557a7df60d081f5d4a0eb109967d107df217943bf88c2d99b9ebcc06c5
+controlnet/control_v11p_sd15_openpose_fp16.safetensors $HF/comfyanonymous/ControlNet-v1-1_fp16_safetensors/resolve/main/control_v11p_sd15_openpose_fp16.safetensors 4003c1da17b0e4ba444e02140e1c0d83bb24b79e4dcfd613c3a554d38f0f89c7
+"
+
 # Arguments for launch.py (passed on to main.py), one per line.
 # $1 = data/comfyui, $2 = port, $3 = host (127.0.0.1, or 0.0.0.0 with --lan).
 # data/comfyui holds your own custom nodes, user settings/workflows and its database;

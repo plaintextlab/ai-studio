@@ -8,3 +8,6 @@
 /models/
 /outputs/
 /inputs/
+
+# Python bytecode caches
+__pycache__/

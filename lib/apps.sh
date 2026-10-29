@@ -4,11 +4,12 @@
 #   apps/<app>/                 app source at the pinned commit (replaced on update)
 #   envs/<platform>/<app>/      the app's own Python with its packages (no venv)
 #   data/<app>/                 app settings/state, kept across updates
-#   data/logs/<app>.log, data/run/<app>.pid
+#   models/<app>/               models, including the pinned ones from APP_MODELS
+#   data/logs/<app>.log, data/run/<app>.pid, data/run/<app>.installing
 
 APP_VARS="APP_TITLE APP_VERSION APP_REPO APP_COMMIT APP_SRC_SHA256 APP_PYTHON APP_PORT
 APP_TORCH_BACKEND APP_EXTRA_INDEX APP_UPSTREAM_REQUIREMENTS APP_REQUIREMENTS_EXCLUDE
-APP_BUILD_WHEELS APP_SMOKE_TEST APP_CUSTOM_NODES"
+APP_BUILD_WHEELS APP_SMOKE_TEST APP_CUSTOM_NODES APP_MODELS"
 
 list_apps() {
     local d; for d in "$STUDIO_ROOT"/recipes/*/recipe.sh; do basename "$(dirname "$d")"; done
@@ -30,6 +31,7 @@ load_recipe() {
     WHEEL_DIR="$STUDIO_ROOT/cache/wheels/$STUDIO_PLATFORM/py$APP_PYTHON"
     APP_PY="$ENV_DIR/bin/python$APP_PYTHON"
     PID_FILE="$STUDIO_ROOT/data/run/$APP.pid"
+    INSTALL_PID_FILE="$STUDIO_ROOT/data/run/$APP.installing"
     LOG_FILE="$STUDIO_ROOT/data/logs/$APP.log"
 }
 
@@ -134,16 +136,63 @@ build_wheels() {
     done < "$BUILD_FILE"
 }
 
+# Models pinned in the recipe (APP_MODELS: "path url sha256" per line, path relative to
+# models/<app>). They go straight into place, not via cache/downloads, since they are
+# large; a file already there is kept as is (checked when it was downloaded).
+fetch_models() {
+    local path url sha dest
+    while read -r path url sha; do
+        case "$path" in ''|\#*) continue ;; esac
+        dest="$STUDIO_ROOT/models/$APP/$path"
+        if [ -f "$dest" ]; then ok "$path (already present)"; continue; fi
+        mkdir -p "$(dirname "$dest")"
+        printf '  %sdownloading %s%s\n' "$C_DIM" "$path" "$C_RST" >&2
+        download_verified "$url" "$sha" "$dest"
+        ok "$path"
+    done <<< "${APP_MODELS:-}"
+}
+
+lock_hash() { cat "$LOCK_FILE" "$BUILD_FILE" | sha256_of /dev/stdin; }
+
+# True when everything the recipe pins is in place: runtime, app source, custom nodes,
+# Python packages and models. Cheap (stamps and file checks), so it runs on every start.
+app_ready() {
+    local rt; rt="$(RT_DIR)"
+    stamp_ok "$rt/bin" "uv-$UV_VERSION" && stamp_ok "$rt/ffmpeg" "$(pin FFMPEG_NAME)" \
+        && stamp_ok "$rt/zig" "zig-$ZIG_VERSION" || return 1
+    [ -x "$APP_PY" ] && [ "$(cat "$ENV_DIR/.studio-lock" 2>/dev/null)" = "$(lock_hash)" ] || return 1
+    [ "$(cat "$APP_DIR/.studio-commit" 2>/dev/null)" = "$APP_COMMIT" ] || return 1
+    local name repo commit sha path url
+    while read -r name repo commit sha; do
+        case "$name" in ''|\#*) continue ;; esac
+        [ "$(cat "$APP_DIR/custom_nodes/$name/.studio-commit" 2>/dev/null)" = "$commit" ] || return 1
+    done <<< "${APP_CUSTOM_NODES:-}"
+    while read -r path url sha; do
+        case "$path" in ''|\#*) continue ;; esac
+        [ -f "$STUDIO_ROOT/models/$APP/$path" ] || return 1
+    done <<< "${APP_MODELS:-}"
+}
+
+# PID of an install of the loaded app that is still running, if any.
+install_pid() {
+    local pid; pid="$(cat "$INSTALL_PID_FILE" 2>/dev/null)" || return 1
+    [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && echo "$pid"
+}
+
 install_app() {
     load_recipe "$1"
     [ -f "$LOCK_FILE" ] || die "No lock file for $APP on $STUDIO_PLATFORM (recipes/$APP/$(basename "$LOCK_FILE"))."
+    install_pid >/dev/null && die "$APP_TITLE is already being installed (process $(install_pid)); wait for it to finish."
+    mkdir -p "$(dirname "$INSTALL_PID_FILE")"
+    echo "$BASHPID" > "$INSTALL_PID_FILE"
     install_runtime
     log "Installing $APP_TITLE $APP_VERSION"
     install_python "$APP_PYTHON"
     fetch_app_source
     fetch_custom_nodes
+    fetch_models
 
-    local want; want="$(cat "$LOCK_FILE" "$BUILD_FILE" | sha256_of /dev/stdin)"
+    local want; want="$(lock_hash)"
     if [ "$(cat "$ENV_DIR/.studio-lock" 2>/dev/null)" = "$want" ] && [ -x "$APP_PY" ]; then
         ok "Python packages (already installed)"
     else
@@ -171,6 +220,7 @@ install_app() {
     fi
     mkdir -p "$APP_DATA" "$STUDIO_ROOT/outputs/$APP"
     cleanup_host_cache
+    rm -f "$INSTALL_PID_FILE"
     log "$APP_TITLE is ready. Start it with: ./studio.sh start $APP"
 }
 
@@ -202,8 +252,14 @@ start_app() {
     # --lan: listen on all interfaces so phones/tablets on the same network can connect.
     local host="127.0.0.1"
     if [ "${1:-}" = "--lan" ]; then host="0.0.0.0"; shift; fi
-    [ -f "$ENV_DIR/.studio-lock" ] || die "$APP_TITLE is not installed in $STUDIO_ROOT. Run: ./studio.sh install $APP (or use the studio folder where it is installed)"
     if app_pid >/dev/null; then ok "$APP_TITLE is already running: $(cat "$APP_DATA/.url" 2>/dev/null)"; return; fi
+    # First start, or the recipe changed (e.g. after git pull): download what is missing.
+    if ! app_ready; then
+        if [ -f "$ENV_DIR/.studio-lock" ]; then log "$APP_TITLE needs an update first (pinned versions or models changed)"
+        else log "$APP_TITLE is not installed yet: installing it first (downloads several GB, once)"; fi
+        install_app "$APP"
+        load_recipe "$APP"
+    fi
 
     # Several apps may run at once; they share the GPU, so warn about memory.
     local self="$APP" other
@@ -296,6 +352,8 @@ status_apps() {
         load_recipe "$a"
         local state="not installed"
         [ -f "$ENV_DIR/.studio-lock" ] && state="installed"
+        [ -f "$ENV_DIR/.studio-lock" ] && ! app_ready && state="installed (update or models pending; done on next start)"
+        install_pid >/dev/null && state="installing"
         app_pid >/dev/null && state="running at $(cat "$APP_DATA/.url" 2>/dev/null)"
         printf '  %-12s %-8s %s\n' "$APP" "$APP_VERSION" "$state"
     done

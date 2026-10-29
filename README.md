@@ -11,9 +11,15 @@ Nothing is installed on the host; every download, cache and config stays inside.
 ## Quick start
 ```bash
 ./studio.sh doctor            # checks GPU driver, drive, free space; tells you how to fix problems
-./studio.sh install wan2gp    # app + pinned dependencies (~15 GB on exFAT, first time only)
 ./studio.sh                   # control panel: start/stop apps, each in its own terminal window
 ```
+
+Nothing needs installing by hand: the first time an app starts, the studio downloads
+what it needs (runtime, Python, the app at its pinned version, its packages and the
+models listed in its recipe), checking every file against its pinned checksum. That is
+several GB per app (about 50 GB for ComfyUI with its models), once; later starts only
+check that everything is in place. After a `git pull` that changes a pin, the next start
+updates what changed. `./studio.sh install <app>` does the same without starting it.
 
 The control panel lists every app with its status, URL and the GPU memory in use.
 Select one or more apps (Space, or their number) and press Enter: each opens in its own
@@ -34,14 +40,22 @@ one app or all.
 ComfyUI models go in `models/comfyui/<type>/` (e.g. checkpoints from Civitai in
 `models/comfyui/checkpoints`, LoRAs in `models/comfyui/loras`); press R in the UI to rescan.
 
+ComfyUI comes with two workflows (`recipes/comfyui/workflows`, copied into its workflow
+list on first start; your edits are kept): **Prompt to Image Generation WF** (Z-Image
+Turbo) and **checkpoint_workflow** (SDXL with face swap and pose variations). The models
+they use are pinned in `recipes/comfyui/recipe.sh` (`APP_MODELS`) and downloaded with the
+app. Before running checkpoint_workflow, upload a face photo in its **Load Image** nodes.
+
 ComfyUI comes with the ReActor face swap nodes (`ReActor 🌌 Fast Face Swap`): connect a
 generated image to `input_image` and a photo of the face to use (a **Load Image** node)
-to `source_image`. Its models download into `models/comfyui` on first use (about 2.5 GB).
+to `source_image`. Its face restore and analysis models download into `models/comfyui`
+on first use (about 2 GB).
 The `checkpoint_workflow` has a second section, **Same character, new pose**: load an
 image you generated as the character, and any photo of a person in the pose you want
 (or a ready OpenPose skeleton, with the `Read pose` node bypassed). IPAdapter keeps the
 character's look and body, an OpenPose ControlNet copies the pose, ReActor keeps the face,
-and the pose prompt is added to the main positive prompt. It needs
+and the pose prompt is added to the main positive prompt. Its models (all downloaded
+with the app) are
 `models/comfyui/clip_vision/CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors` (the
 `h94/IP-Adapter` image encoder) plus, per checkpoint type:
 
@@ -74,7 +88,7 @@ streamed from disk while generating, and a USB 2 link makes loading 20x slower.
 | `config/versions.sh` | Every pinned version and checksum |
 | `lib/` | Scripts behind `studio.sh` |
 | `runtime/<platform>/` | uv, standalone Python builds, ffmpeg, zig (C/C++ compiler) |
-| `recipes/<app>/` | Per app: pinned commit, lock file, launcher |
+| `recipes/<app>/` | Per app: pinned commit, models, lock file, launcher (and ComfyUI's workflows) |
 | `apps/<app>/` | App source at the pinned commit |
 | `envs/<platform>/<app>/` | The app's own Python with its packages |
 | `cache/downloads/` | Verified downloads, kept so reinstalls work offline |

@@ -57,6 +57,14 @@ fetch() {
     fi
     rm -f "$dest"
     printf '  %sdownloading %s%s\n' "$C_DIM" "$name" "$C_RST" >&2
+    download_verified "$url" "$sha" "$dest"
+    echo "$dest"
+}
+
+# download_verified URL SHA256 DEST: downloads to DEST.part (resuming an interrupted
+# download), checks the sha256, then moves it to DEST.
+download_verified() {
+    local url="$1" sha="$2" dest="$3"
     if command -v curl >/dev/null 2>&1; then
         curl -fL --retry 3 --retry-delay 2 -C - --progress-bar -o "$dest.part" "$url" >&2 \
             || die "Download failed: $url"
@@ -68,10 +76,9 @@ fetch() {
     local got; got="$(sha256_of "$dest.part")"
     if [ "$got" != "$sha" ]; then
         rm -f "$dest.part"
-        die "Checksum mismatch for $name (expected $sha, got $got)."
+        die "Checksum mismatch for $(basename "$dest") (expected $sha, got $got)."
     fi
     mv "$dest.part" "$dest"
-    echo "$dest"
 }
 
 # extract_portable ARCHIVE DEST [EXCLUDE_GLOB...]

@@ -31,9 +31,11 @@ open_terminal() {
     host_cmd setsid "${cmd[@]}" >/dev/null 2>&1 < /dev/null &
 }
 
-# Prints "<state> <url>" for the loaded recipe: not-installed, stopped, starting, running.
+# Prints "<state> <url>" for the loaded recipe: installing, not-installed, stopped,
+# starting, running.
 app_state() {
-    if [ ! -f "$ENV_DIR/.studio-lock" ]; then echo "not-installed"
+    if install_pid >/dev/null; then echo "installing"
+    elif [ ! -f "$ENV_DIR/.studio-lock" ]; then echo "not-installed"
     elif ! app_pid >/dev/null; then echo "stopped"
     elif [ -f "$APP_DATA/.url" ]; then echo "running $(cat "$APP_DATA/.url")"
     else echo "starting"
@@ -88,7 +90,7 @@ studio_menu() {
             [ "$i" = "$cur" ] && mark=">"
             [ "${sel[i]}" = 1 ] && box="[x]"
             [ "$st" != "${states[i]}" ] && url="${states[i]#* }"
-            case "$st" in running) color="$C_GRN" ;; starting) color="$C_YLW" ;; esac
+            case "$st" in running) color="$C_GRN" ;; starting|installing) color="$C_YLW" ;; esac
             printf ' %s %s %d  %-12s %s%-13s%s %s\n' "$mark" "$box" $((i + 1)) "${titles[i]}" \
                 "$color" "$st" "$C_RST" "$url"
         done
@@ -126,8 +128,8 @@ studio_menu() {
                 MENU_MSG=()
                 for i in "${targets[@]}"; do
                     case "${states[i]}" in
-                        not-installed) MENU_MSG+=("$(warn "${titles[i]} is not installed. Install it with: ./studio.sh install ${apps[i]}")") ;;
                         running*|starting) MENU_MSG+=("$(ok "${titles[i]} is already running")") ;;
+                        installing) MENU_MSG+=("$(ok "${titles[i]} is being installed; wait for that to finish")") ;;
                         *) menu_start "${apps[i]}" "$lan" ;;
                     esac
                 done
