@@ -1,0 +1,5 @@
+# Gradle and Android build output (the toolchain itself is in cache/android).
+.gradle/
+.kotlin/
+build/
+local.properties
