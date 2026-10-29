@@ -62,7 +62,8 @@ workflow list on first start; your edits are kept):
   wrestling), Lustify for explicit adult content, Animagine XL 4.0 for anime, FLUX.2
   Klein 4B for edits and everything else; or pick one yourself. A **prompt enhancer**
   (Qwen3-4B, running locally) first rewrites a rough prompt into a detailed one, keeping
-  what you asked for; "Prompt used" shows it. Saved in `outputs/comfyui/images`, named
+  what you asked for; "Prompt used" shows it. Edit requests become a precise
+  instruction that also keeps the rest of the picture unchanged. Saved in `outputs/comfyui/images`, named
   after the model. For a newer Lustify (e.g. ZENITH from Civitai, which needs a login),
   put its file in `models/comfyui/checkpoints`: the newest one there is used.
 - **Prompt to Image Generation WF** (Z-Image Turbo) and **checkpoint_workflow** (SDXL

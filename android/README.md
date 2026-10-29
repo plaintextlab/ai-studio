@@ -8,7 +8,12 @@ It runs the same workflow as **3 - Quick image**: the studio's prompt enhancer f
 rewrites your prompt in detail (switch it off in settings), then the best model for it is
 picked on the server (Z-Image Turbo for realistic people, Lustify for adult content,
 Animagine for anime, FLUX.2 Klein for edits and everything else). Under each image the app
-shows the model used and the enhanced prompt.
+shows the model used and the enhanced prompt. Edits are enhanced too, into a precise
+instruction that keeps the rest of the picture as it is.
+
+The face button picks a face photo: until you remove it, it is put on the main person of
+every result (people in the background keep theirs), and it is remembered between
+launches. ReActor does not swap faces onto images it finds explicit.
 
 ## Use
 1. On the PC: `./studio.sh start comfyui --lan` and note the printed address.

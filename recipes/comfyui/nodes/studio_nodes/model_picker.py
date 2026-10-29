@@ -7,9 +7,9 @@ Each model is a specialist:
   Animagine      anime, manga and illustration (SDXL)
 The workflow has one branch per model behind lazy switches, so only the picked one runs.
 
-It also passes on the enhanced prompt (written by Qwen3-4B from the user's, see
-ENHANCE_SYSTEM) when enhancing is on. The model is still picked from what the user
-typed, and edits keep the user's words: an expanded scene would change more than asked.
+It also passes on the enhanced prompt (written by Qwen3-4B from the user's) when
+enhancing is on: a detailed scene for new images (ENHANCE_SYSTEM), a precise instruction
+for edits (ENHANCE_EDIT_SYSTEM). The model is still picked from what the user typed.
 """
 import re
 
@@ -61,6 +61,21 @@ ENHANCE_SYSTEM = (
     "lens, composition, colors and atmosphere. If the user names a style (anime, painting, 3D), describe "
     "it in that style; otherwise describe a realistic photograph. Output only the prompt.")
 
+# For edits: one precise instruction, not a scene (FLUX.2 Klein sees the picture, the
+# enhancer does not), saying what must stay as it is so the editor changes only that.
+ENHANCE_EDIT_SYSTEM = (
+    "You rewrite a short or rough request to edit a picture into one clear instruction for an AI image "
+    "editor that can see the picture. Write 1 to 3 sentences, 20 to 60 words, in plain English: no lists, "
+    "no quotes, no preamble. Start with the change itself as a direct command (Change, Add, Remove, "
+    "Replace, Make, Turn). You cannot see the picture: never describe or guess what is in it now. "
+    "Keep exactly what the user asked for, including where and to whom; when the change is for one "
+    "person or thing, say that only that one changes (\"give only the woman a hat\"). Make the change "
+    "specific: what the new or changed things look like (colors, materials, size, placement) and that "
+    "their lighting and shadows match the picture. Do not invent other changes. End by saying that "
+    "everything else stays exactly the same, including people's faces, bodies, poses and clothing, the "
+    "background, the composition and the framing, unless the user asked to change them. "
+    "Output only the instruction.")
+
 ANIME_TAGS = "masterpiece, high score, great score, absurdres"
 ANIME_NEGATIVE = ("lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, "
                   "fewer digits, cropped, worst quality, low quality, low score, bad score, "
@@ -105,7 +120,7 @@ class PickModel:
                 "editing": ("BOOLEAN", {"default": False}),
                 "model": (MODELS, {"default": "Auto", "tooltip": "Auto picks from the prompt."}),
                 "enhance": ("BOOLEAN", {"default": True,
-                                        "tooltip": "Rewrite the prompt in detail first (new images only)."}),
+                                        "tooltip": "Rewrite the prompt in detail first (an edit as a precise instruction)."}),
             },
             "optional": {
                 # Lazy: only computed (the enhancer only runs) when it will be used.
@@ -114,7 +129,7 @@ class PickModel:
         }
 
     def check_lazy_status(self, prompt, negative, editing, model, enhance, enhanced_prompt=None):
-        return ["enhanced_prompt"] if enhance and not editing and enhanced_prompt is None else []
+        return ["enhanced_prompt"] if enhance and enhanced_prompt is None else []
 
     RETURN_TYPES = ("BOOLEAN", "BOOLEAN", "BOOLEAN", "STRING", "STRING", "STRING", "STRING")
     RETURN_NAMES = ("use_zimage", "use_lustify", "use_anime", "sdxl_checkpoint",
@@ -127,7 +142,7 @@ class PickModel:
 
     def choose(self, prompt, negative, editing, model, enhance, enhanced_prompt=None):
         route = pick(prompt, model, editing)
-        positive = enhanced_prompt if enhance and not editing and enhanced_prompt else prompt
+        positive = enhanced_prompt if enhance and enhanced_prompt else prompt
         if route in ("lustify", "anime") and positive != prompt:
             # SDXL's CLIP weighs the start of a prompt most (77-token chunks): lead with the
             # user's own words so the detail cannot crowd them out.
@@ -165,15 +180,17 @@ class EnhancePrompt:
 
     @classmethod
     def INPUT_TYPES(cls):
-        return {"required": {"clip": ("CLIP",), "prompt": ("STRING", {"multiline": True})}}
+        return {"required": {"clip": ("CLIP",), "prompt": ("STRING", {"multiline": True}),
+                             "editing": ("BOOLEAN", {"default": False})}}
 
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("enhanced_prompt",)
     FUNCTION = "enhance"
     CATEGORY = "studio"
 
-    def enhance(self, clip, prompt):
-        tokens = clip.tokenize(prompt, min_length=1, thinking=False, system_prompt=ENHANCE_SYSTEM)
+    def enhance(self, clip, prompt, editing):
+        system = ENHANCE_EDIT_SYSTEM if editing else ENHANCE_SYSTEM
+        tokens = clip.tokenize(prompt, min_length=1, thinking=False, system_prompt=system)
         ids = clip.generate(tokens, do_sample=True, max_length=256, temperature=0.6, top_k=64,
                             top_p=0.95, min_p=0.05, repetition_penalty=1.05, seed=0)
         text = clip.decode(ids).split("</think>")[-1].strip().strip('"').strip()

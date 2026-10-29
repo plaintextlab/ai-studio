@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -94,6 +96,9 @@ fun StudioScreen(vm: StudioViewModel) {
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) vm.attach(uri)
     }
+    val pickFace = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) vm.setFace(uri)
+    }
 
     LaunchedEffect(vm.message) {
         vm.message?.let { snackbar.showSnackbar(it); vm.message = null }
@@ -120,6 +125,7 @@ fun StudioScreen(vm: StudioViewModel) {
                 text = text,
                 onText = { text = it },
                 onPick = { pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                onPickFace = { pickFace.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 onSend = { vm.send(text); text = "" },
             )
         },
@@ -200,7 +206,12 @@ private fun TurnItem(
                         modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)))
                     Spacer(Modifier.size(10.dp))
                 }
-                Text(turn.prompt, style = MaterialTheme.typography.bodyLarge)
+                Text(turn.prompt, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f, fill = false))
+                turn.face?.let {
+                    Spacer(Modifier.size(10.dp))
+                    Image(it.preview.asImageBitmap(), contentDescription = "Face used",
+                        contentScale = ContentScale.Crop, modifier = Modifier.size(28.dp).clip(CircleShape))
+                }
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -292,10 +303,23 @@ private fun InputBar(
     text: String,
     onText: (String) -> Unit,
     onPick: () -> Unit,
+    onPickFace: () -> Unit,
     onSend: () -> Unit,
 ) {
     Surface(tonalElevation = 3.dp) {
         Column(Modifier.navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
+            vm.face?.let { face ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
+                    Image(face.preview.asImageBitmap(), contentDescription = "Face to use",
+                        contentScale = ContentScale.Crop, modifier = Modifier.size(40.dp).clip(CircleShape))
+                    Spacer(Modifier.size(12.dp))
+                    Text("This face goes on the main person", modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium)
+                    IconButton(onClick = vm::clearFace) {
+                        Icon(Icons.Filled.Close, contentDescription = "Stop using this face")
+                    }
+                }
+            }
             val attachment = vm.attachment
             if (attachment != null) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
@@ -319,6 +343,9 @@ private fun InputBar(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onPick) {
                     Icon(Icons.Filled.AddPhotoAlternate, contentDescription = "Add a picture to edit")
+                }
+                IconButton(onClick = onPickFace) {
+                    Icon(Icons.Filled.Face, contentDescription = "Choose a face to swap in")
                 }
                 TextField(
                     value = text,
@@ -391,7 +418,7 @@ private fun SettingsDialog(vm: StudioViewModel, onClose: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Enhance prompts", style = MaterialTheme.typography.bodyLarge)
-                        Text("Rewrite your prompt in detail before creating (not for edits)",
+                        Text("Rewrite your prompt in detail before creating or editing",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }

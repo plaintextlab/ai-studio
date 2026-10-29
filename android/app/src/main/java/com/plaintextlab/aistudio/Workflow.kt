@@ -38,10 +38,14 @@ object Workflow {
 
     /**
      * [editImage]: name of an uploaded picture to edit, or null for a new image.
-     * [enhance]: rewrite the prompt in detail first (new images only), with the studio's
-     * Qwen3-4B prompt enhancer.
+     * [enhance]: rewrite the prompt first with the studio's Qwen3-4B prompt enhancer (a
+     * detailed scene for new images, a precise instruction for edits).
+     * [faceImage]: name of an uploaded face photo to put on the main person, or null.
      */
-    fun build(prompt: String, width: Int, height: Int, editImage: String?, seed: Long, enhance: Boolean): JSONObject {
+    fun build(
+        prompt: String, width: Int, height: Int, editImage: String?, seed: Long, enhance: Boolean,
+        faceImage: String?,
+    ): JSONObject {
         val w = JSONObject()
         fun node(id: String, type: String, vararg inputs: Pair<String, Any>) {
             val i = JSONObject()
@@ -56,7 +60,7 @@ object Workflow {
         node("30", "StudioPickModel", "prompt" to prompt, "negative" to NEGATIVE,
             "editing" to (editImage != null), "model" to "Auto", "enhance" to enhance,
             "enhanced_prompt" to link("35"))
-        node("35", "StudioEnhancePrompt", "clip" to link("41"), "prompt" to prompt)
+        node("35", "StudioEnhancePrompt", "clip" to link("41"), "prompt" to prompt, "editing" to (editImage != null))
         node(PROMPT_USED_NODE, "PreviewAny", "source" to link("30", 4))
 
         // FLUX.2 Klein.
@@ -129,7 +133,18 @@ object Workflow {
         node("71", "ComfySwitchNode", "switch" to link("30", 1), "on_false" to link("70"), "on_true" to lustify)
         node("72", "ComfySwitchNode", "switch" to link("30", 0), "on_false" to link("71"), "on_true" to link("48"))
         node("73", "StringConcatenate", "string_a" to "images/android_", "string_b" to link("30", 6), "delimiter" to "")
-        node("27", "SaveImage", "images" to link("72"), "filename_prefix" to link("73"))
+
+        // Face swap onto the main person (the largest face, so people in the background
+        // keep theirs), through ReActor; ReActor itself skips images it finds explicit.
+        var image = link("72")
+        if (faceImage != null) {
+            node("80", "LoadImage", "image" to faceImage)
+            node("81", "StudioSwapMainFaces", "image" to image, "model_1_face" to link("80"),
+                "main_people" to 1, "swap_model_1" to true, "swap_model_2" to false,
+                "face_restore_visibility" to 1.0, "codeformer_weight" to 0.5)
+            image = link("81")
+        }
+        node("27", "SaveImage", "images" to image, "filename_prefix" to link("73"))
         return w
     }
 }

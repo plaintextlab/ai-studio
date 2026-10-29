@@ -33,6 +33,7 @@ data class Turn(
     val id: Long,
     val prompt: String,
     val input: PickedImage?,
+    val face: PickedImage?,
     val shape: Shape,
     val state: State,
     val result: Result? = null,
@@ -54,6 +55,10 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     var shape by mutableStateOf(Shape.Square)
     /** The picture the next prompt edits, or null for a new image. */
     var attachment by mutableStateOf<PickedImage?>(null)
+    /** Face put on the main person of every result until removed; kept between launches. */
+    var face by mutableStateOf(loadFace())
+        private set
+    private val faceFile get() = java.io.File(getApplication<Application>().filesDir, "face.jpg")
     /** One-off messages for the snackbar. */
     var message by mutableStateOf<String?>(null)
 
@@ -92,6 +97,31 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun setFace(uri: android.net.Uri) {
+        viewModelScope.launch {
+            try {
+                val picked = withContext(Dispatchers.IO) {
+                    Images.load(getApplication(), uri).also { faceFile.writeBytes(it.jpeg) }
+                }
+                face = picked
+            } catch (e: Exception) {
+                message = "Could not open that picture"
+            }
+        }
+    }
+
+    fun clearFace() {
+        face = null
+        faceFile.delete()
+    }
+
+    private fun loadFace(): PickedImage? = try {
+        val file = java.io.File(getApplication<Application>().filesDir, "face.jpg")
+        if (file.exists()) file.readBytes().let { PickedImage(Images.decode(it), it) } else null
+    } catch (e: Exception) {
+        null
+    }
+
     /** "Edit this": use a result as the picture for the next prompt. */
     fun editResult(result: Result) {
         val jpeg = java.io.ByteArrayOutputStream()
@@ -100,7 +130,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun send(prompt: String) {
-        val turn = Turn(System.nanoTime(), prompt.trim(), attachment, shape, Turn.State.Waiting)
+        val turn = Turn(System.nanoTime(), prompt.trim(), attachment, face, shape, Turn.State.Waiting)
         attachment = null
         turns += turn
         run(turn)
@@ -138,8 +168,10 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun generate(url: String, turn: Turn): Result {
         val comfy = ComfyClient(url)
         val inputName = turn.input?.let { comfy.uploadImage(it.jpeg, "android_${UUID.randomUUID()}.jpg") }
+        // Named after its content: the same face is stored once on the server.
+        val faceName = turn.face?.let { comfy.uploadImage(it.jpeg, "android_face_${it.jpeg.contentHashCode().toUInt()}.jpg") }
         val workflow = Workflow.build(turn.prompt, turn.shape.width, turn.shape.height, inputName,
-            Random.nextLong(0, 1L shl 50), enhance)
+            Random.nextLong(0, 1L shl 50), enhance, faceName)
         val id = comfy.queue(workflow, clientId)
         while (true) {
             val finished = comfy.result(id)
