@@ -1,6 +1,6 @@
 {
- "last_node_id": 35,
- "last_link_id": 35,
+ "last_node_id": 32,
+ "last_link_id": 32,
  "nodes": [
   {
    "id": 1,
@@ -20,7 +20,7 @@
    "outputs": [],
    "properties": {},
    "widgets_values": [
-    "1. For each model: upload their image (from 'Character creation', or any photo where the face is clear), give a name, and describe body and clothes (paste the Body and Clothes text from 'Character creation'). Model 1 is on the LEFT of the picture, Model 2 on the RIGHT.\n2. Describe the action and the camera angle.\n3. Optional: to copy the poses from a reference photo, right-click the green 'Action reference' group > Bypass Group Nodes (turns it on), and load the photo. Put the person on the left of the photo in Model 1's place.\n4. Queue. Two variations are saved as outputs/comfyui/scenes/<Name1>_<Name2>_00001_.png\n\nThe face swap needs a visible face: if one is turned away, try another seed or ask for it in the camera text (e.g. 'both faces visible')."
+    "1. For each model: upload their image (from 'Character creation', or any photo where the face is clear), give a name, and describe body and clothes (paste the Body and Clothes text from 'Character creation'). Model 1 is on the LEFT of the picture, Model 2 on the RIGHT.\n2. Describe the action and the camera angle.\n3. Optional: to copy the poses from a reference photo, right-click the green 'Action reference' group > Bypass Group Nodes (turns it on), and load the photo. Put the person on the left of the photo in Model 1's place.\n4. Queue. Two variations are saved as outputs/comfyui/scenes/<Name1>_<Name2>_00001_.png\n\nFaces go on the two main people (the largest faces), so people in the background keep theirs. To keep a model's generated face (no photo of them), set their 'swap' to no in 'Swap faces'. The swap needs a visible face: if one is turned away, try another seed or ask for it in the camera text (e.g. 'both faces visible')."
    ],
    "title": "How to use",
    "color": "#432",
@@ -87,7 +87,7 @@
      "type": "STRING",
      "slot_index": 0,
      "links": [
-      31
+      28
      ]
     }
    ],
@@ -153,7 +153,7 @@
      "type": "IMAGE",
      "slot_index": 0,
      "links": [
-      29
+      27
      ]
     },
     {
@@ -193,7 +193,7 @@
      "type": "STRING",
      "slot_index": 0,
      "links": [
-      33
+      30
      ]
     }
    ],
@@ -1121,241 +1121,62 @@
   },
   {
    "id": 29,
-   "type": "ReActorOptions",
+   "type": "StudioSwapMainFaces",
    "pos": [
     2640,
-    460
+    0
    ],
    "size": [
     340,
-    230
+    260
    ],
    "flags": {},
    "order": 28,
    "mode": 0,
-   "inputs": [],
-   "outputs": [
-    {
-     "name": "OPTIONS",
-     "type": "OPTIONS",
-     "slot_index": 0,
-     "links": [
-      27
-     ]
-    }
-   ],
-   "properties": {
-    "Node name for S&R": "ReActorOptions"
-   },
-   "title": "Left face",
-   "widgets_values": [
-    "left-right",
-    "0",
-    "no",
-    "large-small",
-    "0",
-    "no",
-    1,
-    true
-   ]
-  },
-  {
-   "id": 30,
-   "type": "ReActorOptions",
-   "pos": [
-    2640,
-    730
-   ],
-   "size": [
-    340,
-    230
-   ],
-   "flags": {},
-   "order": 29,
-   "mode": 0,
-   "inputs": [],
-   "outputs": [
-    {
-     "name": "OPTIONS",
-     "type": "OPTIONS",
-     "slot_index": 0,
-     "links": [
-      30
-     ]
-    }
-   ],
-   "properties": {
-    "Node name for S&R": "ReActorOptions"
-   },
-   "title": "Right face",
-   "widgets_values": [
-    "left-right",
-    "1",
-    "no",
-    "large-small",
-    "0",
-    "no",
-    1,
-    true
-   ]
-  },
-  {
-   "id": 31,
-   "type": "ReActorFaceSwapOpt",
-   "pos": [
-    2640,
-    0
-   ],
-   "size": [
-    340,
-    260
-   ],
-   "flags": {},
-   "order": 30,
-   "mode": 0,
    "inputs": [
     {
-     "name": "input_image",
+     "name": "image",
      "type": "IMAGE",
      "link": 25
     },
     {
-     "name": "source_image",
+     "name": "model_1_face",
      "type": "IMAGE",
      "link": 26
     },
     {
-     "name": "face_model",
-     "type": "FACE_MODEL",
-     "link": null
-    },
-    {
-     "name": "options",
-     "type": "OPTIONS",
+     "name": "model_2_face",
+     "type": "IMAGE",
      "link": 27
-    },
-    {
-     "name": "face_boost",
-     "type": "FACE_BOOST",
-     "link": null
     }
    ],
    "outputs": [
     {
-     "name": "SWAPPED_IMAGE",
+     "name": "IMAGE",
      "type": "IMAGE",
      "slot_index": 0,
      "links": [
-      28
+      31
      ]
-    },
-    {
-     "name": "FACE_MODEL",
-     "type": "FACE_MODEL",
-     "slot_index": 1,
-     "links": []
-    },
-    {
-     "name": "ORIGINAL_IMAGE",
-     "type": "IMAGE",
-     "slot_index": 2,
-     "links": []
     }
    ],
    "properties": {
-    "Node name for S&R": "ReActorFaceSwapOpt"
+    "Node name for S&R": "StudioSwapMainFaces"
    },
-   "title": "Model 1 face",
+   "title": "Swap faces (set a model to 'no' to keep the generated face)",
    "widgets_values": [
+    2,
     true,
-    "inswapper_128.onnx",
-    "retinaface_resnet50",
-    "codeformer-v0.1.0.pth",
+    true,
     1,
     0.5
    ]
   },
   {
-   "id": 32,
-   "type": "ReActorFaceSwapOpt",
-   "pos": [
-    3020,
-    0
-   ],
-   "size": [
-    340,
-    260
-   ],
-   "flags": {},
-   "order": 31,
-   "mode": 0,
-   "inputs": [
-    {
-     "name": "input_image",
-     "type": "IMAGE",
-     "link": 28
-    },
-    {
-     "name": "source_image",
-     "type": "IMAGE",
-     "link": 29
-    },
-    {
-     "name": "face_model",
-     "type": "FACE_MODEL",
-     "link": null
-    },
-    {
-     "name": "options",
-     "type": "OPTIONS",
-     "link": 30
-    },
-    {
-     "name": "face_boost",
-     "type": "FACE_BOOST",
-     "link": null
-    }
-   ],
-   "outputs": [
-    {
-     "name": "SWAPPED_IMAGE",
-     "type": "IMAGE",
-     "slot_index": 0,
-     "links": [
-      34
-     ]
-    },
-    {
-     "name": "FACE_MODEL",
-     "type": "FACE_MODEL",
-     "slot_index": 1,
-     "links": []
-    },
-    {
-     "name": "ORIGINAL_IMAGE",
-     "type": "IMAGE",
-     "slot_index": 2,
-     "links": []
-    }
-   ],
-   "properties": {
-    "Node name for S&R": "ReActorFaceSwapOpt"
-   },
-   "title": "Model 2 face",
-   "widgets_values": [
-    true,
-    "inswapper_128.onnx",
-    "retinaface_resnet50",
-    "codeformer-v0.1.0.pth",
-    1,
-    0.5
-   ]
-  },
-  {
-   "id": 33,
+   "id": 30,
    "type": "StringConcatenate",
    "pos": [
-    3020,
+    2640,
     300
    ],
    "size": [
@@ -1363,13 +1184,64 @@
     140
    ],
    "flags": {},
-   "order": 32,
+   "order": 29,
    "mode": 0,
    "inputs": [
     {
      "name": "string_b",
      "type": "STRING",
-     "link": 31,
+     "link": 28,
+     "widget": {
+      "name": "string_b"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "name": "STRING",
+     "type": "STRING",
+     "slot_index": 0,
+     "links": [
+      29
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "StringConcatenate"
+   },
+   "widgets_values": [
+    "scenes/",
+    "",
+    ""
+   ]
+  },
+  {
+   "id": 31,
+   "type": "StringConcatenate",
+   "pos": [
+    2640,
+    480
+   ],
+   "size": [
+    340,
+    140
+   ],
+   "flags": {},
+   "order": 30,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "string_a",
+     "type": "STRING",
+     "link": 29,
+     "widget": {
+      "name": "string_a"
+     }
+    },
+    {
+     "name": "string_b",
+     "type": "STRING",
+     "link": 30,
      "widget": {
       "name": "string_b"
      }
@@ -1388,57 +1260,6 @@
    "properties": {
     "Node name for S&R": "StringConcatenate"
    },
-   "widgets_values": [
-    "scenes/",
-    "",
-    ""
-   ]
-  },
-  {
-   "id": 34,
-   "type": "StringConcatenate",
-   "pos": [
-    3020,
-    480
-   ],
-   "size": [
-    340,
-    140
-   ],
-   "flags": {},
-   "order": 33,
-   "mode": 0,
-   "inputs": [
-    {
-     "name": "string_a",
-     "type": "STRING",
-     "link": 32,
-     "widget": {
-      "name": "string_a"
-     }
-    },
-    {
-     "name": "string_b",
-     "type": "STRING",
-     "link": 33,
-     "widget": {
-      "name": "string_b"
-     }
-    }
-   ],
-   "outputs": [
-    {
-     "name": "STRING",
-     "type": "STRING",
-     "slot_index": 0,
-     "links": [
-      35
-     ]
-    }
-   ],
-   "properties": {
-    "Node name for S&R": "StringConcatenate"
-   },
    "title": "File name",
    "widgets_values": [
     "",
@@ -1447,10 +1268,10 @@
    ]
   },
   {
-   "id": 35,
+   "id": 32,
    "type": "SaveImage",
    "pos": [
-    3400,
+    3020,
     0
    ],
    "size": [
@@ -1458,18 +1279,18 @@
     440
    ],
    "flags": {},
-   "order": 34,
+   "order": 31,
    "mode": 0,
    "inputs": [
     {
      "name": "images",
      "type": "IMAGE",
-     "link": 34
+     "link": 31
     },
     {
      "name": "filename_prefix",
      "type": "STRING",
-     "link": 35,
+     "link": 32,
      "widget": {
       "name": "filename_prefix"
      }
@@ -1689,7 +1510,7 @@
    25,
    27,
    0,
-   31,
+   29,
    0,
    "IMAGE"
   ],
@@ -1697,79 +1518,55 @@
    26,
    2,
    0,
-   31,
+   29,
    1,
    "IMAGE"
   ],
   [
    27,
-   29,
+   5,
    0,
-   31,
-   3,
-   "OPTIONS"
+   29,
+   2,
+   "IMAGE"
   ],
   [
    28,
-   31,
+   3,
    0,
-   32,
+   30,
    0,
-   "IMAGE"
+   "STRING"
   ],
   [
    29,
-   5,
+   30,
    0,
-   32,
-   1,
-   "IMAGE"
+   31,
+   0,
+   "STRING"
   ],
   [
    30,
-   30,
+   6,
    0,
-   32,
-   3,
-   "OPTIONS"
+   31,
+   1,
+   "STRING"
   ],
   [
    31,
-   3,
+   29,
    0,
-   33,
-   0,
-   "STRING"
-  ],
-  [
    32,
-   33,
-   0,
-   34,
-   0,
-   "STRING"
-  ],
-  [
-   33,
-   6,
-   0,
-   34,
-   1,
-   "STRING"
-  ],
-  [
-   34,
-   32,
-   0,
-   35,
    0,
    "IMAGE"
   ],
   [
-   35,
-   34,
+   32,
+   31,
    0,
-   35,
+   32,
    1,
    "STRING"
   ]

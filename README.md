@@ -50,7 +50,9 @@ workflow list on first start; your edits are kept):
   with their image (for the face) and a description of body and clothes (paste it from
   Character creation), plus what they do and the camera angle. Z-Image Turbo draws the
   scene, which keeps two people touching apart and well formed (SDXL merges them), and
-  ReActor puts each one's face back. Optionally copies the poses from a reference photo
+  the studio's **Swap main faces** node puts each one's face on the right person (the
+  main people are the largest faces, so people in the background keep theirs; set a
+  model's swap to no to keep a generated face). Optionally copies the poses from a reference photo
   (switch on the green group; Z-Image's pose ControlNet). Makes two variations per run in
   `outputs/comfyui/scenes/<name1>_<name2>`.
 - **Prompt to Image Generation WF** (Z-Image Turbo) and **checkpoint_workflow** (SDXL
@@ -101,7 +103,7 @@ streamed from disk while generating, and a USB 2 link makes loading 20x slower.
 | `config/versions.sh` | Every pinned version and checksum |
 | `lib/` | Scripts behind `studio.sh` |
 | `runtime/<platform>/` | uv, standalone Python builds, ffmpeg, zig (C/C++ compiler) |
-| `recipes/<app>/` | Per app: pinned commit, models, lock file, launcher (and ComfyUI's workflows) |
+| `recipes/<app>/` | Per app: pinned commit, models, lock file, launcher (and ComfyUI's workflows and studio nodes) |
 | `apps/<app>/` | App source at the pinned commit |
 | `envs/<platform>/<app>/` | The app's own Python with its packages |
 | `cache/downloads/` | Verified downloads, kept so reinstalls work offline |

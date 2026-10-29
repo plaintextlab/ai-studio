@@ -1,10 +1,11 @@
 """Starts ComfyUI with the studio's folders.
 
-Models come from models/comfyui (--models-directory). Custom nodes load from two
-places: the pinned ones the installer puts in apps/comfyui/custom_nodes, and any you
-add yourself in data/comfyui/custom_nodes. ComfyUI only takes the second on the command
-line, so the first goes in an extra paths file, written on every start (so its absolute
-path follows the studio folder when it moves).
+Models come from models/comfyui (--models-directory). Custom nodes load from three
+places: the pinned ones the installer puts in apps/comfyui/custom_nodes, the studio's
+own in recipes/comfyui/nodes, and any you add yourself in data/comfyui/custom_nodes.
+ComfyUI only takes the last on the command line, so the others go in an extra paths
+file, written on every start (so their absolute paths follow the studio folder when it
+moves).
 
 Run with the app folder as the working directory: python launch.py <main.py args...>
 """
@@ -71,7 +72,9 @@ def main():
     with open(config, "w", encoding="utf-8") as f:
         f.write("# Written by recipes/comfyui/launch.py on every start; edits are lost.\n")
         f.write("studio:\n")
-        f.write(f"    custom_nodes: {os.path.join(APP_DIR, 'custom_nodes')}\n")
+        f.write("    custom_nodes: |\n")
+        f.write(f"        {os.path.join(APP_DIR, 'custom_nodes')}\n")
+        f.write(f"        {os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nodes')}\n")
 
     sys.path.insert(0, APP_DIR)
     sys.argv = ["main.py"] + args + ["--extra-model-paths-config", config]
