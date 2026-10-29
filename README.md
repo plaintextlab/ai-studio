@@ -55,11 +55,16 @@ workflow list on first start; your edits are kept):
   model's swap to no to keep a generated face). Optionally copies the poses from a reference photo
   (switch on the green group; Z-Image's pose ControlNet). Makes two variations per run in
   `outputs/comfyui/pose_scenes/<name1>_<name2>`.
+- **3 - Quick image**: the easy one, like Grok. Write a prompt and queue for new
+  images; or turn on "Edit an image", load a picture and say what to change ("make it
+  night", "give him a red jacket"). FLUX.2 Klein 4B, a few seconds per image. Saved in
+  `outputs/comfyui/images`.
 - **Prompt to Image Generation WF** (Z-Image Turbo) and **checkpoint_workflow** (SDXL
   with face swap and a pose variation section).
 
 The models they use are pinned in `recipes/comfyui/recipe.sh` (`APP_MODELS`) and
-downloaded with the app. Upload your own photos in their **Load Image** nodes first.
+downloaded with the app. Upload your own photos in their **Load Image** nodes first
+(an example picture, `example.jpg`, is copied into the inputs on first start).
 
 ComfyUI comes with the ReActor face swap nodes (`ReActor 🌌 Fast Face Swap`): connect a
 generated image to `input_image` and a photo of the face to use (a **Load Image** node)

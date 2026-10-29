@@ -55,6 +55,17 @@ def seed_workflows(user_dir):
         f.write("\n".join(sorted(seeded)) + "\n")
 
 
+def seed_inputs(input_dir):
+    """Copies the bundled example inputs (recipes/comfyui/inputs) into the input folder
+    when missing, so the workflows' image slots have a picture to start from."""
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inputs")
+    if not os.path.isdir(src):
+        return
+    for name in os.listdir(src):
+        if not os.path.exists(os.path.join(input_dir, name)):
+            shutil.copyfile(os.path.join(src, name), os.path.join(input_dir, name))
+
+
 def main():
     args = sys.argv[1:]
     for i, a in enumerate(args[:-1]):
@@ -65,6 +76,7 @@ def main():
     os.makedirs(os.path.join(data_dir, "custom_nodes"), exist_ok=True)
 
     seed_workflows(args[args.index("--user-directory") + 1])
+    seed_inputs(args[args.index("--input-directory") + 1])
 
     for name in MODEL_FOLDERS:
         os.makedirs(os.path.join(MODELS, name), exist_ok=True)
