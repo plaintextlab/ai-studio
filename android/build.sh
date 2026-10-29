@@ -73,9 +73,15 @@ if [ ! -d "$ANDROID_HOME/build-tools/34.0.0" ] || [ ! -d "$ANDROID_HOME/platform
     "$SDKMANAGER" "${SDK_PACKAGES[@]}" >/dev/null
 fi
 
+# Release build (smaller) signed with the release key when there is one; the same key
+# is in the repository secrets, so local and GitHub builds update each other.
+KEY="$ROOT/data/android/release.properties"
+if [ -f "$KEY" ]; then
+    set -a; . "$KEY"; set +a
+fi
 log "Building"
 "$A/gradle/bin/gradle" --no-daemon --quiet -p "$HERE" \
-    --project-cache-dir "$A/project-cache" assembleDebug
+    --project-cache-dir "$A/project-cache" assembleRelease
 mkdir -p "$ROOT/outputs/android"
-cp "$HERE/app/build/outputs/apk/debug/app-debug.apk" "$ROOT/outputs/android/AI-Studio.apk"
+cp "$HERE/app/build/outputs/apk/release/app-release.apk" "$ROOT/outputs/android/AI-Studio.apk"
 log "Done: outputs/android/AI-Studio.apk"

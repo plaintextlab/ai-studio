@@ -13,8 +13,32 @@ android {
         // Android 10+: saving to Pictures needs no storage permission there.
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // Set by the release workflow from the tag (v1.2.0 -> 1.2.0) and its run number.
+        versionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
+        versionName = System.getenv("VERSION_NAME") ?: "1.0"
+    }
+
+    // The release key comes from the environment (android/build.sh reads
+    // data/android/release.properties; the GitHub workflow uses repository secrets).
+    // Without it, release builds are signed with the debug key.
+    val keystore = System.getenv("SIGNING_KEYSTORE")
+    signingConfigs {
+        if (keystore != null) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+        }
     }
 
     compileOptions {
