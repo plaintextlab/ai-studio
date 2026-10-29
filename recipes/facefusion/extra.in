@@ -1,0 +1,4 @@
+# Added on top of FaceFusion's own requirements.txt when locking.
+# GPU onnxruntime (upstream installer's "cuda@13" choice) plus NVIDIA's CUDA/cuDNN
+# wheels, which replace the libraries upstream expects from conda.
+onnxruntime-gpu[cuda,cudnn]==1.30.0

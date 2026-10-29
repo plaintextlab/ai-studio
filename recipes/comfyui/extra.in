@@ -1,0 +1,15 @@
+# Added on top of ComfyUI's own requirements.txt when locking.
+# Same torch/Triton/Sage Attention versions as Wan2GP (CUDA 13).
+torch==2.10.0
+torchvision==0.25.0
+torchaudio==2.10.0
+triton>=3.6,<3.7
+sageattention @ https://github.com/deepbeepmeep/SageAttention/releases/download/v2.2.0-linux.cg1/sageattention-2.2.0+cu130torch2.10.0.cg1-cp312-cp312-linux_x86_64.whl
+
+# ReActor face swap custom node (see APP_CUSTOM_NODES). GPU onnxruntime with NVIDIA's
+# CUDA/cuDNN wheels, as in FaceFusion. Headless OpenCV: no GUI libraries needed on the
+# host. ultralytics (only for its optional mask helper) is left out for that reason.
+onnxruntime-gpu[cuda,cudnn]==1.30.0
+onnx==1.23.1
+opencv-python-headless==5.0.0.93
+segment-anything==1.0

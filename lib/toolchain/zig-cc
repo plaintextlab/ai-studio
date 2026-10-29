@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# C/C++ compiler wrapper around the studio's bundled zig (zig-c++ sets ZIG_CC_MODE=c++).
+# Used as CC/CXX for building source-only packages and by Triton at runtime.
+set -e
+self_dir="$(cd "$(dirname "$0")" && pwd -P)"
+zig="$self_dir/../../runtime/${STUDIO_PLATFORM:-linux-x64}/zig/zig"
+mode="${ZIG_CC_MODE:-cc}"
+
+# zig's linker does not understand "-l:libfoo.so.1" (Triton links libcuda that way),
+# so resolve such entries to the full file path using the -L directories.
+dirs=()
+for a in "$@"; do case "$a" in -L?*) dirs+=("${a#-L}") ;; esac; done
+args=()
+for a in "$@"; do
+    case "$a" in
+        -l:*)
+            f="${a#-l:}"; p=""
+            for d in "${dirs[@]}" /lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu /usr/lib64 /usr/lib; do
+                if [ -e "$d/$f" ]; then p="$d/$f"; break; fi
+            done
+            args+=("${p:-$a}") ;;
+        *) args+=("$a") ;;
+    esac
+done
+
+# glibc 2.28 target: binaries built here also run on older distros (laptop, other PCs).
+# -w: these are third-party sources; warnings only add noise to app logs.
+exec "$zig" "$mode" -target x86_64-linux-gnu.2.28 -w "${args[@]}"

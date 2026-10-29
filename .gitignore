@@ -1,0 +1,10 @@
+# Everything generated or downloaded stays out of git; the repo holds only
+# scripts and pins.
+/runtime/
+/envs/
+/apps/
+/cache/
+/data/
+/models/
+/outputs/
+/inputs/

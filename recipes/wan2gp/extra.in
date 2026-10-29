@@ -1,0 +1,7 @@
+# Added on top of Wan2GP's own requirements.txt when locking.
+# Versions from Wan2GP's setup_config.json, "RTX_30/40/50" Linux profile.
+torch==2.10.0
+torchvision==0.25.0
+torchaudio==2.10.0
+triton>=3.6,<3.7
+sageattention @ https://github.com/deepbeepmeep/SageAttention/releases/download/v2.2.0-linux.cg1/sageattention-2.2.0+cu130torch2.10.0.cg1-cp311-cp311-linux_x86_64.whl
