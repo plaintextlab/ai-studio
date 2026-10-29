@@ -21,8 +21,15 @@ APP_UPSTREAM_REQUIREMENTS="requirements.txt"
 # sha256 (of the codeload.github.com tarball), re-lock, reinstall and test.
 #   ReActor v0.7.1: face swap (ReActorFaceSwap node). Downloads its models
 #   (inswapper_128, face analysis, face restore) into models/comfyui on first use.
+#   IPAdapter plus (2025-04-14): keeps a character's look from a reference image.
+#   Models: models/comfyui/ipadapter + clip_vision (see README).
+#   controlnet_aux (2026-10-11): pose/depth/line preprocessors. Only the packages its
+#   DWPose and OpenPose nodes need are in extra.in; the others fail to load (logged at
+#   startup). DWPose downloads its models into models/comfyui/annotators on first use.
 APP_CUSTOM_NODES="
 comfyui-reactor Gourieff/ComfyUI-ReActor 0b377b00d47daf08db5e572e5083435d63a94d48 40afea1b0bdec0c802cafa684a3ee74f50e12e7f6dd05c7917671590dcbf223a
+comfyui-ipadapter-plus cubiq/ComfyUI_IPAdapter_plus a0f451a5113cf9becb0847b92884cb10cbdec0ef 7a349d80859a1a603623dd03f3d974ac261d1039a66c8e5b5eb5419d2f4f4e02
+comfyui-controlnet-aux Fannovel16/comfyui_controlnet_aux a587a4c1594524c1d2de5cd1a86cd868ff448e1c a8a0e95ee92bafd60c9aa7f89a9cbf8b1a08c3c5da23caf1a7868f76d20406f3
 "
 
 # Arguments for launch.py (passed on to main.py), one per line.

@@ -20,6 +20,8 @@ studio_env() {
     # Model / ML caches
     export HF_HOME="$R/models/huggingface"
     export TORCH_HOME="$R/models/torch"
+    # ComfyUI's controlnet_aux preprocessors (DWPose etc.) download here, not into the app.
+    export AUX_ANNOTATOR_CKPTS_PATH="$R/models/comfyui/annotators"
     # Plain HTTPS downloads: the hf_xet backend has stalled mid-download (open but
     # idle connections, no error); HTTPS resumes reliably from the partial file.
     export HF_HUB_DISABLE_XET=1

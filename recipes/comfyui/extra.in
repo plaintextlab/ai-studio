@@ -13,3 +13,8 @@ onnxruntime-gpu[cuda,cudnn]==1.30.0
 onnx==1.23.1
 opencv-python-headless==5.0.0.93
 segment-anything==1.0
+
+# controlnet_aux custom node: just what its DWPose/OpenPose preprocessors import.
+# Its full requirements.txt (mediapipe, trimesh, GUI OpenCV, ...) is left out.
+matplotlib
+scikit-image

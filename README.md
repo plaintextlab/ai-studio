@@ -37,6 +37,23 @@ ComfyUI models go in `models/comfyui/<type>/` (e.g. checkpoints from Civitai in
 ComfyUI comes with the ReActor face swap nodes (`ReActor 🌌 Fast Face Swap`): connect a
 generated image to `input_image` and a photo of the face to use (a **Load Image** node)
 to `source_image`. Its models download into `models/comfyui` on first use (about 2.5 GB).
+The `checkpoint_workflow` has a second section, **Same character, new pose**: load an
+image you generated as the character, and any photo of a person in the pose you want
+(or a ready OpenPose skeleton, with the `Read pose` node bypassed). IPAdapter keeps the
+character's look and body, an OpenPose ControlNet copies the pose, ReActor keeps the face,
+and the pose prompt is added to the main positive prompt. It needs
+`models/comfyui/clip_vision/CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors` (the
+`h94/IP-Adapter` image encoder) plus, per checkpoint type:
+
+| Checkpoint | `models/comfyui/ipadapter/` | `models/comfyui/controlnet/` (pick in the workflow) |
+|---|---|---|
+| SDXL | `ip-adapter-plus_sdxl_vit-h.safetensors` | `controlnet-openpose-sdxl-1.0.safetensors` (xinsir) |
+| SD 1.5 | `ip-adapter-plus_sd15.safetensors` | `control_v11p_sd15_openpose_fp16.safetensors` |
+
+IPAdapter picks its file from the checkpoint type by itself; the ControlNet you switch
+by hand (with the SD 1.5 one, set `scale_stick_for_xinsr_cn` to disable). DWPose
+downloads its own models into `models/comfyui/annotators` on first use.
+
 Custom nodes the studio installs are pinned in `recipes/comfyui/recipe.sh`
 (`APP_CUSTOM_NODES`); ones you add yourself go in `data/comfyui/custom_nodes`.
 
