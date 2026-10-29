@@ -13,6 +13,9 @@ class ComfyException(message: String) : IOException(message)
 /** An image ComfyUI saved: what /view needs to fetch it. */
 data class OutputImage(val filename: String, val subfolder: String, val type: String)
 
+/** What a finished prompt produced: its saved images, and text shown by preview nodes. */
+data class Finished(val images: List<OutputImage>, val texts: Map<String, String>)
+
 /**
  * ComfyUI's HTTP API (the same one its web page uses). All calls block; run them off
  * the main thread.
@@ -46,19 +49,22 @@ class ComfyClient(baseUrl: String) {
     }
 
     /**
-     * Where a queued prompt is: null while it waits or runs, else the images it saved.
+     * Where a queued prompt is: null while it waits or runs, else what it produced.
      * Throws when it failed.
      */
-    fun result(promptId: String): List<OutputImage>? {
+    fun result(promptId: String): Finished? {
         val all = JSONObject(request("/history/$promptId").decodeToString())
         val entry = all.optJSONObject(promptId) ?: return null
         val status = entry.optJSONObject("status") ?: return null
         if (status.optString("status_str") == "error") throw ComfyException(executionError(status))
         if (!status.optBoolean("completed")) return null
         val images = mutableListOf<OutputImage>()
+        val texts = mutableMapOf<String, String>()
         val outputs = entry.optJSONObject("outputs") ?: JSONObject()
         for (node in outputs.keys()) {
-            val list = outputs.getJSONObject(node).optJSONArray("images") ?: continue
+            val out = outputs.getJSONObject(node)
+            out.optJSONArray("text")?.optString(0)?.let { texts[node] = it }
+            val list = out.optJSONArray("images") ?: continue
             for (i in 0 until list.length()) {
                 val img = list.getJSONObject(i)
                 if (img.optString("type") == "output") {
@@ -66,7 +72,7 @@ class ComfyClient(baseUrl: String) {
                 }
             }
         }
-        return images
+        return Finished(images, texts)
     }
 
     /** True while the prompt is still waiting behind others (not running yet). */

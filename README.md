@@ -57,8 +57,14 @@ workflow list on first start; your edits are kept):
   `outputs/comfyui/pose_scenes/<name1>_<name2>`.
 - **3 - Quick image**: the easy one, like Grok. Write a prompt and queue for new
   images; or turn on "Edit an image", load a picture and say what to change ("make it
-  night", "give him a red jacket"). FLUX.2 Klein 4B, a few seconds per image. Saved in
-  `outputs/comfyui/images`.
+  night", "give him a red jacket"). The studio's **Pick model** node chooses the model
+  from the prompt: Z-Image Turbo for realistic people (also several together, e.g.
+  wrestling), Lustify for explicit adult content, Animagine XL 4.0 for anime, FLUX.2
+  Klein 4B for edits and everything else; or pick one yourself. A **prompt enhancer**
+  (Qwen3-4B, running locally) first rewrites a rough prompt into a detailed one, keeping
+  what you asked for; "Prompt used" shows it. Saved in `outputs/comfyui/images`, named
+  after the model. For a newer Lustify (e.g. ZENITH from Civitai, which needs a login),
+  put its file in `models/comfyui/checkpoints`: the newest one there is used.
 - **Prompt to Image Generation WF** (Z-Image Turbo) and **checkpoint_workflow** (SDXL
   with face swap and a pose variation section).
 

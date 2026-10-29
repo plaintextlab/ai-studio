@@ -34,7 +34,10 @@ comfyui-controlnet-aux Fannovel16/comfyui_controlnet_aux a587a4c1594524c1d2de5cd
 
 # Models the bundled workflows (recipes/comfyui/workflows) need, downloaded on install
 # or on the first start: "path url sha256" per line, path under models/comfyui (about
-# 45 GB in all). Models used through a node (ReActor face restore and analysis, DWPose)
+# 59 GB in all). Lustify (Quick image's adult model) comes from a Hugging Face mirror of
+# Civitai's file, checked against Civitai's published sha256; Pick model uses a newer
+# version instead when one is in the folder. Models used through a node (ReActor face
+# restore and analysis, DWPose)
 # download themselves on first use; inswapper does not, so it is listed here.
 HF="https://huggingface.co"
 APP_MODELS="
@@ -50,6 +53,8 @@ controlnet/controlnet-openpose-sdxl-1.0.safetensors $HF/xinsir/controlnet-openpo
 controlnet/control_v11p_sd15_openpose_fp16.safetensors $HF/comfyanonymous/ControlNet-v1-1_fp16_safetensors/resolve/main/control_v11p_sd15_openpose_fp16.safetensors 4003c1da17b0e4ba444e02140e1c0d83bb24b79e4dcfd613c3a554d38f0f89c7
 diffusion_models/flux-2-klein-4b.safetensors $HF/Comfy-Org/Flux-2-Klein-4B/resolve/main/split_files/diffusion_models/flux-2-klein-4b.safetensors ec3d4e733a771f61c052fb4856c48b336c55eaf2c65487c2a1faeb9bbda7a343
 vae/flux2-vae.safetensors $HF/Comfy-Org/Flux-2-Klein-4B/resolve/main/split_files/vae/flux2-vae.safetensors 868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3
+checkpoints/animagine-xl-4.0-opt.safetensors $HF/cagliostrolab/animagine-xl-4.0/resolve/main/animagine-xl-4.0-opt.safetensors 6327eca98bfb6538dd7a4edce22484a1bbc57a8cff6b11d075d40da1afb847ac
+checkpoints/lustifySDXLNSFW_oltFIXEDTEXTURES.safetensors $HF/MishGUN1/LUSTIFY/resolve/main/lustifySDXLNSFW_oltFIXEDTEXTURES.safetensors d7e7e35b0f60c42ad427ce81e30569a3881143ecf2f9cb50021a52947f69d22f
 model_patches/Z-Image-Turbo-Fun-Controlnet-Union-2.1-lite-2602-8steps.safetensors $HF/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Turbo-Fun-Controlnet-Union-2.1-lite-2602-8steps.safetensors 3ea098db9bd145be525c7e2366920b6d76c5ffd46b3d7aa8169bbc943fdaee35
 "
 

@@ -51,6 +51,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -70,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -215,7 +217,7 @@ private fun TurnItem(
                             .clickable { onOpen(result) },
                     )
                 }
-                Row(Modifier.padding(top = 4.dp)) {
+                Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { onSave(result) }) {
                         Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(6.dp)); Text("Save")
@@ -224,6 +226,24 @@ private fun TurnItem(
                         Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(6.dp)); Text("Edit this")
                     }
+                    Spacer(Modifier.weight(1f))
+                    result.model?.let {
+                        Text(it, style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(end = 8.dp))
+                    }
+                }
+                // The enhanced prompt, when the enhancer rewrote it: tap to read it all.
+                result.promptUsed?.takeIf { it.isNotBlank() && it != turn.prompt }?.let { used ->
+                    var expanded by remember { mutableStateOf(false) }
+                    Text(
+                        "Enhanced prompt: $used",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = if (expanded) Int.MAX_VALUE else 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 12.dp).clickable { expanded = !expanded },
+                    )
                 }
             }
         }
@@ -367,6 +387,16 @@ private fun SettingsDialog(vm: StudioViewModel, onClose: () -> Unit) {
                     Text("Test connection")
                 }
                 status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Enhance prompts", style = MaterialTheme.typography.bodyLarge)
+                        Text("Rewrite your prompt in detail before creating (not for edits)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = vm.enhance, onCheckedChange = vm::updateEnhance)
+                }
             }
         },
         confirmButton = {

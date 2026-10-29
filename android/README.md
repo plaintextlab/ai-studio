@@ -4,8 +4,11 @@ A small Material 3 app for the studio's ComfyUI, in the style of Grok: describe 
 image and get it, or add a photo (or tap **Edit this** on a result) and say what to
 change. Results can be saved to the phone's gallery (Pictures/AI Studio).
 
-It runs the same model as the **3 - Quick image** workflow (FLUX.2 Klein 4B, with the
-realism negative prompt), so the models ComfyUI downloads are all it needs.
+It runs the same workflow as **3 - Quick image**: the studio's prompt enhancer first
+rewrites your prompt in detail (switch it off in settings), then the best model for it is
+picked on the server (Z-Image Turbo for realistic people, Lustify for adult content,
+Animagine for anime, FLUX.2 Klein for edits and everything else). Under each image the app
+shows the model used and the enhanced prompt.
 
 ## Use
 1. On the PC: `./studio.sh start comfyui --lan` and note the printed address.

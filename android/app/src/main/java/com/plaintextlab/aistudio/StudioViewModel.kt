@@ -22,8 +22,11 @@ enum class Shape(val label: String, val width: Int, val height: Int) {
     Landscape("Landscape", 1216, 832),
 }
 
-/** A finished image: the PNG as ComfyUI saved it, and a bitmap to show. */
-class Result(val png: ByteArray, val bitmap: Bitmap, val name: String)
+/**
+ * A finished image: the PNG as ComfyUI saved it, a bitmap to show, the model that made it
+ * and the prompt it was given (the enhanced one when enhancing).
+ */
+class Result(val png: ByteArray, val bitmap: Bitmap, val name: String, val model: String?, val promptUsed: String?)
 
 /** One request and its answer, shown as a pair in the list. */
 data class Turn(
@@ -44,6 +47,9 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
 
     var server by mutableStateOf(prefs.getString("server", "").orEmpty())
         private set
+    /** Rewrite prompts in detail before generating (new images only). */
+    var enhance by mutableStateOf(prefs.getBoolean("enhance", true))
+        private set
     val turns = mutableStateListOf<Turn>()
     var shape by mutableStateOf(Shape.Square)
     /** The picture the next prompt edits, or null for a new image. */
@@ -54,6 +60,11 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     fun updateServer(url: String) {
         server = normalize(url)
         prefs.edit().putString("server", server).apply()
+    }
+
+    fun updateEnhance(on: Boolean) {
+        enhance = on
+        prefs.edit().putBoolean("enhance", on).apply()
     }
 
     suspend fun testServer(url: String): String = withContext(Dispatchers.IO) {
@@ -128,14 +139,15 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         val comfy = ComfyClient(url)
         val inputName = turn.input?.let { comfy.uploadImage(it.jpeg, "android_${UUID.randomUUID()}.jpg") }
         val workflow = Workflow.build(turn.prompt, turn.shape.width, turn.shape.height, inputName,
-            Random.nextLong(0, 1L shl 50))
+            Random.nextLong(0, 1L shl 50), enhance)
         val id = comfy.queue(workflow, clientId)
         while (true) {
-            val images = comfy.result(id)
-            if (images != null) {
-                val first = images.firstOrNull() ?: throw ComfyException("ComfyUI made no image")
+            val finished = comfy.result(id)
+            if (finished != null) {
+                val first = finished.images.firstOrNull() ?: throw ComfyException("ComfyUI made no image")
                 val png = comfy.download(first)
-                return Result(png, Images.decode(png), first.filename)
+                return Result(png, Images.decode(png), first.filename, Workflow.modelName(first.filename),
+                    finished.texts[Workflow.PROMPT_USED_NODE])
             }
             val waiting = comfy.isWaiting(id)
             withContext(Dispatchers.Main) {

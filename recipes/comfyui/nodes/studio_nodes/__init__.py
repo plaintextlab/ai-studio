@@ -5,6 +5,8 @@ numbers every face it detects, so in a scene with people in the background its
 "left-right" index 0 can be a bystander. This node first keeps only the main faces
 (the largest ones, as many as there are models), orders those left to right, and then
 runs ReActor's own swap on each of them, image by image.
+
+Pick model (model_picker.py): chooses the specialist model for a prompt.
 """
 import sys
 
@@ -90,5 +92,7 @@ class SwapMainFaces:
         return (torch.cat(out, dim=0),)
 
 
-NODE_CLASS_MAPPINGS = {"StudioSwapMainFaces": SwapMainFaces}
-NODE_DISPLAY_NAME_MAPPINGS = {"StudioSwapMainFaces": "Swap main faces (left to right)"}
+from .model_picker import NODE_CLASS_MAPPINGS as _PICK, NODE_DISPLAY_NAME_MAPPINGS as _PICK_NAMES
+
+NODE_CLASS_MAPPINGS = {"StudioSwapMainFaces": SwapMainFaces, **_PICK}
+NODE_DISPLAY_NAME_MAPPINGS = {"StudioSwapMainFaces": "Swap main faces (left to right)", **_PICK_NAMES}
