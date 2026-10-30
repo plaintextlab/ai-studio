@@ -6,15 +6,21 @@ Each model is a specialist:
   Lustify        explicit adult content (realistic SDXL)
   Animagine      anime, manga and illustration (SDXL)
 The workflow has one branch per model behind lazy switches, so only the picked one runs.
+Any other SD 1.5 or SDXL checkpoint can be asked for by name (the phone app lists them,
+from /studio/models); Auto never picks those.
 
 It also passes on the enhanced prompt (written by Qwen3-4B from the user's) when
 enhancing is on: a detailed scene for new images (ENHANCE_SYSTEM), a precise instruction
 for edits (ENHANCE_EDIT_SYSTEM). The model is still picked from what the user typed.
 """
+import json
+import os
 import re
 
 import folder_paths
 import nodes
+from aiohttp import web
+from server import PromptServer
 
 MODELS = ["Auto", "FLUX.2 Klein", "Z-Image Turbo", "Lustify (adult)", "Animagine (anime)"]
 
@@ -30,6 +36,20 @@ LUSTIFY = [
     "lustifySDXLNSFWSFW_v20.safetensors",
 ]
 ANIMAGINE = "animagine-xl-4.0-opt.safetensors"
+
+# What the other checkpoints are good at, by the start of their file name (lower case).
+# Unknown ones are listed with a generic hint.
+CHECKPOINTS = {
+    "majicmixrealistic": ("majicMIX realistic", "Realistic portraits and photos of people, mostly East Asian looks"),
+    "dreamshaper": ("DreamShaper", "All-round: fantasy, art and semi-realistic scenes"),
+    "sd_xl_base": ("SDXL base", "The plain SDXL base model; the other models are usually better"),
+    "juggernaut": ("Juggernaut", "Realistic photos: people, places and products"),
+    "realisticvision": ("Realistic Vision", "Realistic photos of people"),
+    "epicrealism": ("epiCRealism", "Realistic photos of people"),
+    "ponydiffusion": ("Pony Diffusion", "Cartoon, anime and furry art, also adult"),
+    "revanimated": ("ReV Animated", "Fantasy art and semi-realistic illustration"),
+    "deliberate": ("Deliberate", "All-round, realistic or artistic"),
+}
 
 
 def _words(*words):
@@ -126,7 +146,56 @@ def pick(prompt, model="Auto", editing=False):
     return "klein"
 
 
-def checkpoint(route):
+def architecture(path):
+    """'sd15' or 'sdxl' from a .safetensors file's tensor names (its header), else None."""
+    try:
+        with open(path, "rb") as f:
+            size = int.from_bytes(f.read(8), "little")
+            if not 0 < size < 100_000_000:
+                return None
+            keys = json.loads(f.read(size)).keys()
+    except (OSError, ValueError):
+        return None
+    if any(k.startswith("conditioner.embedders.1.") for k in keys):
+        return "sdxl"
+    if any(k.startswith("cond_stage_model.") for k in keys):
+        return "sd15"
+    return None
+
+
+def other_checkpoints():
+    """The SD 1.5 and SDXL checkpoints without a branch of their own, for the phone app."""
+    found = []
+    for name in sorted(folder_paths.get_filename_list("checkpoints"), key=str.lower):
+        if name in LUSTIFY or name == ANIMAGINE:
+            continue
+        arch = architecture(folder_paths.get_full_path("checkpoints", name) or "")
+        if arch is None:
+            continue
+        stem = os.path.splitext(os.path.basename(name))[0]
+        key = next((k for k in CHECKPOINTS if stem.lower().startswith(k)), None)
+        label, hint = CHECKPOINTS[key] if key else (stem.replace("_", " "), "")
+        version = re.search(r"_v?(\d+(\.\d+)?)$", stem, re.IGNORECASE) if key else None
+        if version:
+            label += f" v{version.group(1)}"
+        kind = "SD 1.5, smaller pictures" if arch == "sd15" else "SDXL"
+        found.append({"name": name, "label": label, "arch": arch,
+                      "hint": f"{hint} ({kind})" if hint else f"Another {kind.split(',')[0]} model on the PC"})
+    return found
+
+
+@PromptServer.instance.routes.get("/studio/models")
+async def list_models(request):
+    return web.json_response(other_checkpoints())
+
+
+def slug(name):
+    """'majicmixRealistic_v7.safetensors' -> 'majicmixrealistic-v7' (for file names)."""
+    stem = os.path.splitext(os.path.basename(name))[0]
+    return re.sub(r"[^a-z0-9.]+", "-", stem.lower()).strip("-")
+
+
+def checkpoint_for(route):
     """The SDXL file for a route. Loaded by name, so a missing model only stops its own
     route (ComfyUI checks every file named in a workflow before running any of it)."""
     present = set(folder_paths.get_filename_list("checkpoints"))
@@ -152,10 +221,13 @@ class PickModel:
             "optional": {
                 # Lazy: only computed (the enhancer only runs) when it will be used.
                 "enhanced_prompt": ("STRING", {"lazy": True, "forceInput": True}),
+                # A checkpoint by file name (any SD 1.5 or SDXL model; the phone app's branch
+                # for it reads sdxl_checkpoint). Overrides model, except for edits.
+                "checkpoint": ("STRING", {"forceInput": True}),
             },
         }
 
-    def check_lazy_status(self, prompt, negative, editing, model, enhance, enhanced_prompt=None):
+    def check_lazy_status(self, prompt, negative, editing, model, enhance, enhanced_prompt=None, checkpoint=None):
         return ["enhanced_prompt"] if enhance and enhanced_prompt is None else []
 
     RETURN_TYPES = ("BOOLEAN", "BOOLEAN", "BOOLEAN", "STRING", "STRING", "STRING", "STRING")
@@ -167,19 +239,24 @@ class PickModel:
                    "Lustify for explicit adult content, Animagine for anime, FLUX.2 Klein for "
                    "edits and everything else.")
 
-    def choose(self, prompt, negative, editing, model, enhance, enhanced_prompt=None):
-        route = pick(prompt, model, editing)
+    def choose(self, prompt, negative, editing, model, enhance, enhanced_prompt=None, checkpoint=None):
+        route = "checkpoint" if checkpoint and not editing else pick(prompt, model, editing)
         positive = enhanced_prompt if enhance and enhanced_prompt else prompt
-        if route in ("lustify", "anime") and positive != prompt:
+        if route in ("lustify", "anime", "checkpoint") and positive != prompt:
             # SDXL's CLIP weighs the start of a prompt most (77-token chunks): lead with the
             # user's own words so the detail cannot crowd them out.
             positive = f"{prompt}. {positive}"
         if route == "anime":
             positive = f"{positive}, {ANIME_TAGS}"
             negative = ANIME_NEGATIVE
-        sdxl = checkpoint(route) if route in ("lustify", "anime") else ""
-        label = {"klein": "flux2-klein", "zimage": "z-image", "lustify": "lustify",
-                 "anime": "animagine"}[route]
+        if route == "checkpoint":
+            if checkpoint not in folder_paths.get_filename_list("checkpoints"):
+                raise RuntimeError(f"{checkpoint} is not in models/comfyui/checkpoints.")
+            sdxl, label = checkpoint, slug(checkpoint)
+        else:
+            sdxl = checkpoint_for(route) if route in ("lustify", "anime") else ""
+            label = {"klein": "flux2-klein", "zimage": "z-image", "lustify": "lustify",
+                     "anime": "animagine"}[route]
         print(f"[Pick model] {label}" + (f" ({sdxl})" if sdxl else ""))
         return (route == "zimage", route == "lustify", route == "anime", sdxl,
                 positive, negative, label)

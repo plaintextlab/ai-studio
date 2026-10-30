@@ -145,6 +145,12 @@ class ComfyClient(baseUrl: String) {
         return List(list.length()) { list.getJSONObject(it) }
     }
 
+    /** The PC's other checkpoints (any SD 1.5 or SDXL model), for the model menu. */
+    fun models(): List<PcModel> {
+        val list = JSONArray(request("/studio/models").decodeToString())
+        return List(list.length()) { PcModel.fromJson(list.getJSONObject(it)) }
+    }
+
     private fun dataUrl(url: String): android.graphics.Bitmap =
         Images.decode(android.util.Base64.decode(url.substringAfter(","), android.util.Base64.DEFAULT))
 

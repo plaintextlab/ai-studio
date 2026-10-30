@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.util.UUID
@@ -38,6 +39,17 @@ enum class ImageModel(val label: String, val short: String, val server: String, 
         "Realistic explicit adult content"),
     Animagine("Animagine", "Animagine", "Animagine (anime)",
         "Anime, manga and illustration"),
+}
+
+/** A checkpoint on the PC with no branch of its own: any SD 1.5 or SDXL model (/studio/models). */
+data class PcModel(val name: String, val label: String, val arch: String, val hint: String) {
+    val sd15 get() = arch == "sd15"
+    fun toJson(): JSONObject = JSONObject().put("name", name).put("label", label).put("arch", arch).put("hint", hint)
+
+    companion object {
+        fun fromJson(o: JSONObject) = PcModel(o.getString("name"), o.optString("label", o.getString("name")),
+            o.optString("arch", "sdxl"), o.optString("hint"))
+    }
 }
 
 /** The image tabs: Quick image, and YouTube thumbnails. */
@@ -76,6 +88,8 @@ data class Turn(
     val question: FaceQuestion? = null,
     /** The model asked for (new images). */
     val model: ImageModel = ImageModel.Auto,
+    /** A PC checkpoint asked for instead of [model]. */
+    val pcModel: PcModel? = null,
 ) {
     enum class State { Waiting, Working, Done, Failed }
 }
@@ -96,6 +110,12 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     /** Model for new images. */
     var model by mutableStateOf(ImageModel.entries.firstOrNull { it.name == prefs.getString("model", null) } ?: ImageModel.Auto)
         private set
+    /** A checkpoint from [pcModels] used instead of [model], or null. */
+    var pcModel by mutableStateOf(prefs.getString("pcModel", null)
+        ?.let { runCatching { PcModel.fromJson(JSONObject(it)) }.getOrNull() })
+        private set
+    /** The PC's other checkpoints (empty until it answers). */
+    val pcModels = mutableStateListOf<PcModel>()
     val turns = mutableStateListOf<Turn>()
     val thumbnailTurns = mutableStateListOf<Turn>()
     fun turnsFor(mode: Mode) = if (mode == Mode.Image) turns else thumbnailTurns
@@ -128,6 +148,13 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         val url = server
         if (url.isBlank()) return
         viewModelScope.launch {
+            // First the model list, so imported images get their models' names.
+            runCatching { withContext(Dispatchers.IO) { ComfyClient(url).models() } }.onSuccess { list ->
+                list.forEach { Workflow.addModelName(it.name, it.label) }
+                pcModels.clear()
+                pcModels += list
+                pcModel?.let { p -> if (list.none { it.name == p.name }) updateModel(model) }
+            }
             val known = (turns + thumbnailTurns).flatMap { it.results }.mapNotNull { it.key }.toSet()
             val imported = runCatching {
                 withContext(Dispatchers.IO) { history.importFromPc(ComfyClient(url), known) }
@@ -161,7 +188,13 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
 
     fun updateModel(m: ImageModel) {
         model = m
-        prefs.edit().putString("model", m.name).apply()
+        pcModel = null
+        prefs.edit().putString("model", m.name).remove("pcModel").apply()
+    }
+
+    fun updatePcModel(m: PcModel) {
+        pcModel = m
+        prefs.edit().putString("pcModel", m.toJson().toString()).apply()
     }
 
     suspend fun testServer(url: String): String = withContext(Dispatchers.IO) {
@@ -228,7 +261,8 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
 
     fun send(prompt: String) {
         val turn = Turn(newId(), Mode.Image, prompt.trim(), attachment, face, shape, Turn.State.Waiting, count = count,
-            model = if (attachment == null) model else ImageModel.Auto)
+            model = if (attachment == null) model else ImageModel.Auto,
+            pcModel = if (attachment == null) pcModel else null)
         attachment = null
         turns += turn
         run(turn)
@@ -244,7 +278,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     /** "Again": the same request (prompt, picture, face, shape, count, model) as a new one, with a new seed. */
     fun again(turn: Turn) {
         val copy = Turn(newId(), turn.mode, turn.prompt, turn.input, turn.face, turn.shape, Turn.State.Waiting,
-            text = turn.text, count = turn.count, model = turn.model)
+            text = turn.text, count = turn.count, model = turn.model, pcModel = turn.pcModel)
         turnsFor(turn.mode) += copy
         run(copy)
     }
@@ -309,7 +343,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
             Workflow.buildThumbnail(turn.prompt, turn.text, seed, enhance, faceName, turn.count)
         } else {
             Workflow.build(turn.prompt, turn.shape.width, turn.shape.height, inputName, seed, enhance, faceName, turn.count,
-                turn.model.server)
+                turn.model.server, turn.pcModel)
         }
         val id = comfy.queue(workflow, clientId)
         val finished = comfy.await(id) { waiting ->

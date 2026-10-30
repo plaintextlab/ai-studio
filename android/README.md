@@ -24,6 +24,10 @@ same prompt, picture, face and number of images, with new results.
 The model chip (**Auto** at first) chooses the model for new images; its menu says what
 each one is best at. Auto picks one per prompt as described above; the choice is
 remembered, and **↻** uses the same model again. Edits always use FLUX.2 Klein.
+Below those, the menu lists every other SD 1.5 or SDXL checkpoint in
+`models/comfyui/checkpoints` on the PC (e.g. majicMIX realistic, DreamShaper), so a model
+you download there shows up the next time the app connects. SD 1.5 models make smaller
+pictures (768 on the long side), the size they are made for. Auto never picks them.
 
 The face button picks a face photo, used until you remove it and remembered between
 launches. With one face in a picture it is put on that person. With several, the app

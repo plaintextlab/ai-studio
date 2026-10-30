@@ -495,7 +495,9 @@ private fun InputBar(
                 } else {
                     Spacer(Modifier.weight(1f))
                 }
-                if (!thumbnail && attachment == null) ModelChip(vm.model, vm::updateModel)
+                if (!thumbnail && attachment == null) {
+                    ModelChip(vm.model, vm.pcModel, vm.pcModels, vm::updateModel, vm::updatePcModel)
+                }
                 CountChip(vm.count, vm::updateCount)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -536,12 +538,33 @@ private fun InputBar(
 
 /** The model for new images; the menu says what each one is best at. */
 @Composable
-private fun ModelChip(model: ImageModel, onChange: (ImageModel) -> Unit) {
+private fun ModelChip(
+    model: ImageModel, pcModel: PcModel?, pcModels: List<PcModel>,
+    onChange: (ImageModel) -> Unit, onPcModel: (PcModel) -> Unit,
+) {
     var open by remember { mutableStateOf(false) }
+    @Composable
+    fun Item(label: String, hint: String, selected: Boolean, onClick: () -> Unit) = DropdownMenuItem(
+        text = {
+            Column(Modifier.padding(vertical = 4.dp)) {
+                Text(label, style = MaterialTheme.typography.bodyLarge)
+                if (hint.isNotEmpty()) {
+                    Text(hint, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        leadingIcon = {
+            if (selected) Icon(Icons.Filled.Check, contentDescription = "Selected")
+            else Spacer(Modifier.size(24.dp))
+        },
+        onClick = { onClick(); open = false },
+    )
     Box {
         AssistChip(
             onClick = { open = true },
-            label = { Text(model.short) },
+            label = { Text(pcModel?.label ?: model.short, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            modifier = Modifier.widthIn(max = 160.dp),
             leadingIcon = { Icon(Icons.Filled.Palette, contentDescription = "Model", modifier = Modifier.size(18.dp)) },
         )
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.widthIn(max = 320.dp)) {
@@ -551,20 +574,17 @@ private fun ModelChip(model: ImageModel, onChange: (ImageModel) -> Unit) {
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             HorizontalDivider()
             ImageModel.entries.forEach { m ->
-                DropdownMenuItem(
-                    text = {
-                        Column(Modifier.padding(vertical = 4.dp)) {
-                            Text(m.label, style = MaterialTheme.typography.bodyLarge)
-                            Text(m.bestFor, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    },
-                    leadingIcon = {
-                        if (m == model) Icon(Icons.Filled.Check, contentDescription = "Selected")
-                        else Spacer(Modifier.size(24.dp))
-                    },
-                    onClick = { onChange(m); open = false },
-                )
+                Item(m.label, m.bestFor, pcModel == null && m == model) { onChange(m) }
+            }
+            if (pcModels.isNotEmpty()) {
+                HorizontalDivider()
+                Text("Other models on the PC (Auto never picks these)",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                pcModels.forEach { p ->
+                    Item(p.label, p.hint, pcModel?.name == p.name) { onPcModel(p) }
+                }
             }
         }
     }

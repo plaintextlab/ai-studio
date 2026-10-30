@@ -62,7 +62,7 @@ class History(root: File) {
 
     private fun toJson(turn: Turn) = JSONObject()
         .put("id", turn.id).put("mode", turn.mode.name).put("prompt", turn.prompt).put("text", turn.text)
-        .put("shape", turn.shape.name).put("time", turn.time).put("model", turn.model.name)
+        .put("shape", turn.shape.name).put("time", turn.time).put("model", turn.model.name).put("pcModel", turn.pcModel?.toJson())
         .put("results", JSONArray().apply {
             turn.results.forEach { r ->
                 put(JSONObject().put("file", r.file.name).put("name", r.name).put("model", r.model ?: "")
@@ -94,6 +94,7 @@ class History(root: File) {
             time = o.optLong("time"),
             count = results.size,
             model = ImageModel.entries.firstOrNull { it.name == o.optString("model") } ?: ImageModel.Auto,
+            pcModel = o.optJSONObject("pcModel")?.let(PcModel::fromJson),
         )
     }
 }

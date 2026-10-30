@@ -13,7 +13,8 @@ import org.json.JSONObject
  *   Animagine      anime and illustration
  * Each image is saved in its own folder on the PC with its prompt (prompt.txt), named after
  * the model ([modelName] reads it back). A prompt enhancer (Qwen3-4B, on the server) can
- * rewrite the prompt in detail first.
+ * rewrite the prompt in detail first. Any other checkpoint on the PC ([PcModel]) can be
+ * asked for by name; it gets a branch of its own, which then makes the image.
  */
 object Workflow {
     private const val NEGATIVE =
@@ -34,8 +35,19 @@ object Workflow {
     fun modelName(filename: String): String? =
         Regex("^android_(.+?)_\\d+_?\\.png$").find(filename)?.groupValues?.get(1)?.let(::modelLabel)
 
+    private val pcNames = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** Names a PC checkpoint in [modelLabel] (Pick model labels it by [slug]). */
+    fun addModelName(file: String, label: String) {
+        pcNames[slug(file)] = label
+    }
+
+    /** "majicmixRealistic_v7.safetensors" -> "majicmixrealistic-v7", as Pick model labels it. */
+    fun slug(file: String) = file.substringAfterLast('/').substringBeforeLast('.').lowercase()
+        .replace(Regex("[^a-z0-9.]+"), "-").trim('-')
+
     /** "z-image" (Pick model's label) -> "Z-Image Turbo" */
-    fun modelLabel(slug: String): String = MODEL_NAMES[slug] ?: slug
+    fun modelLabel(slug: String): String = MODEL_NAMES[slug] ?: pcNames[slug] ?: slug
 
     /** Node whose output is the prompt actually used (shown under the image). */
     const val PROMPT_USED_NODE = "74"
@@ -47,10 +59,11 @@ object Workflow {
      * [faceImage]: name of an uploaded face photo to put in, or null. With several faces in a
      * picture the server asks which one (see [ComfyClient.faceQuestions]).
      * [count]: images per run. [model]: the Pick model choice ("Auto" picks from the prompt).
+     * [checkpoint]: a PC checkpoint to use instead (new images only).
      */
     fun build(
         prompt: String, width: Int, height: Int, editImage: String?, seed: Long, enhance: Boolean,
-        faceImage: String?, count: Int, model: String = "Auto",
+        faceImage: String?, count: Int, model: String = "Auto", checkpoint: PcModel? = null,
     ): JSONObject {
         val w = JSONObject()
         fun node(id: String, type: String, vararg inputs: Pair<String, Any>) {
@@ -66,6 +79,8 @@ object Workflow {
         node("30", "StudioPickModel", "prompt" to prompt, "negative" to NEGATIVE,
             "editing" to (editImage != null), "model" to model, "enhance" to enhance,
             "enhanced_prompt" to link("35"))
+        val custom = checkpoint?.takeIf { editImage == null }
+        custom?.let { w.getJSONObject("30").getJSONObject("inputs").put("checkpoint", it.name) }
         node("35", "StudioEnhancePrompt", "clip" to link("41"), "prompt" to prompt, "editing" to (editImage != null))
         node(PROMPT_USED_NODE, "PreviewAny", "source" to link("30", 4))
 
@@ -119,12 +134,13 @@ object Workflow {
         node("48", "VAEDecode", "samples" to link("47"), "vae" to link("42"))
 
         // SDXL specialists, loaded by the file name Pick model gives.
-        fun sdxl(base: Int, steps: Int, cfg: Double, sampler: String, scheduler: String): JSONArray {
+        fun sdxl(base: Int, steps: Int, cfg: Double, sampler: String, scheduler: String,
+                 w: Int = width, h: Int = height): JSONArray {
             val id = { n: Int -> (base + n).toString() }
             node(id(0), "StudioLoadCheckpointByName", "ckpt_name" to link("30", 3))
             node(id(1), "CLIPTextEncode", "clip" to link(id(0), 1), "text" to link("30", 4))
             node(id(2), "CLIPTextEncode", "clip" to link(id(0), 1), "text" to link("30", 5))
-            node(id(3), "EmptyLatentImage", "width" to width, "height" to height, "batch_size" to count)
+            node(id(3), "EmptyLatentImage", "width" to w, "height" to h, "batch_size" to count)
             node(id(4), "KSampler", "model" to link(id(0)), "positive" to link(id(1)), "negative" to link(id(2)),
                 "latent_image" to link(id(3)), "seed" to seed, "steps" to steps, "cfg" to cfg,
                 "sampler_name" to sampler, "scheduler" to scheduler, "denoise" to 1.0)
@@ -142,7 +158,14 @@ object Workflow {
 
         // Face swap through ReActor (which itself skips images it finds explicit): one face
         // is replaced right away; with several the node waits until the app says which.
-        var image = link("72")
+        // A PC checkpoint makes the image itself (so the switches above do not run). SD 1.5
+        // works at about 768 on the long side; larger, it draws people twice.
+        val picked = custom?.let {
+            val scale = if (it.sd15) 768.0 / maxOf(width, height) else 1.0
+            fun fit(n: Int) = Math.round(n * scale / 64).toInt() * 64
+            sdxl(90, 30, if (it.sd15) 7.0 else 6.0, "dpmpp_2m_sde", "karras", fit(width), fit(height))
+        }
+        var image = picked ?: link("72")
         if (faceImage != null) {
             node("80", "LoadImage", "image" to faceImage)
             node("81", "StudioSwapFace", "image" to image, "face" to link("80"), "enabled" to true,
