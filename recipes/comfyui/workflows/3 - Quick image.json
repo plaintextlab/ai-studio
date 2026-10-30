@@ -1,6 +1,6 @@
 {
  "last_node_id": 62,
- "last_link_id": 105,
+ "last_link_id": 109,
  "nodes": [
   {
    "id": 1,
@@ -20,7 +20,7 @@
    "outputs": [],
    "properties": {},
    "widgets_values": [
-    "Write what you want in 'Prompt' and queue.\n\nTo change a picture instead: turn 'Edit an image' on, load the picture in 'Image', and say what to change (e.g. 'make it night', 'give him a red jacket', 'turn this into a watercolor painting'). The result keeps the picture's shape; Width and Height only apply to new images.\n\nTo put a particular face on the person: turn 'Change the face' on and load a clear photo of the face in 'Face photo'. It goes on the main person (the largest face); people in the background keep theirs.\n\n'Negative prompt' lists what to avoid (extra limbs and fingers, deformed faces, a fake look). For paintings, cartoons or 3D, remove those words from it first.\n\n'Model' on Auto picks the best model for the prompt: Z-Image Turbo for realistic people (also several together), Lustify for explicit adult content, Animagine for anime, FLUX.2 Klein for edits and everything else. Choose one there to force it.\n\n'enhance' (on the same node) first rewrites your prompt in detail with a local language model (Qwen3-4B), keeping what you asked for: 'Prompt used' shows the result. For edits it writes a precise instruction that also keeps the rest of the picture as it is.\n\nImages are saved in outputs/comfyui/images, named after the model that made them. Queue again for new variations."
+    "Write what you want in 'Prompt' and queue.\n\nTo change a picture instead: turn 'Edit an image' on, load the picture in 'Image', and say what to change (e.g. 'make it night', 'give him a red jacket', 'turn this into a watercolor painting'). The result keeps the picture's shape; Width and Height only apply to new images.\n\nTo put a particular face on the person: turn 'Change the face' on and load a clear photo of the face in 'Face photo'. With one face in the picture it is replaced right away. With several, the picture is made first, then a window shows the faces it found (numbered left to right) and asks which one to replace (or keep them all).\n\n'Negative prompt' lists what to avoid (extra limbs and fingers, deformed faces, a fake look). For paintings, cartoons or 3D, remove those words from it first.\n\n'Model' on Auto picks the best model for the prompt: Z-Image Turbo for realistic people (also several together), Lustify for explicit adult content, Animagine for anime, FLUX.2 Klein for edits and everything else. Choose one there to force it.\n\n'enhance' (on the same node) first rewrites your prompt in detail with a local language model (Qwen3-4B), keeping what you asked for: 'Prompt used' shows the result. For edits it writes a precise instruction that also keeps the rest of the picture as it is.\n\nImages are saved in outputs/comfyui/images, each in its own folder named after the model that made it, with the prompt it was made with (prompt.txt). Queue again for new variations."
    ],
    "title": "How to use",
    "color": "#432",
@@ -48,7 +48,8 @@
      "slot_index": 0,
      "links": [
       1,
-      46
+      46,
+      106
      ]
     }
    ],
@@ -444,7 +445,8 @@
       6,
       51,
       65,
-      79
+      79,
+      107
      ]
     },
     {
@@ -454,7 +456,8 @@
      "links": [
       53,
       67,
-      81
+      81,
+      108
      ]
     },
     {
@@ -462,7 +465,8 @@
      "type": "STRING",
      "slot_index": 6,
      "links": [
-      103
+      103,
+      109
      ]
     }
    ],
@@ -2713,14 +2717,14 @@
   },
   {
    "id": 60,
-   "type": "StudioSwapMainFaces",
+   "type": "StudioSwapFace",
    "pos": [
     2000,
     1160
    ],
    "size": [
     300,
-    260
+    180
    ],
    "flags": {},
    "order": 59,
@@ -2732,22 +2736,17 @@
      "link": 100
     },
     {
-     "name": "model_1_face",
+     "name": "face",
      "type": "IMAGE",
      "link": 101
     },
     {
-     "name": "swap_model_1",
+     "name": "enabled",
      "type": "BOOLEAN",
      "link": 102,
      "widget": {
-      "name": "swap_model_1"
+      "name": "enabled"
      }
-    },
-    {
-     "name": "model_2_face",
-     "type": "IMAGE",
-     "link": null
     }
    ],
    "outputs": [
@@ -2761,12 +2760,10 @@
     }
    ],
    "properties": {
-    "Node name for S&R": "StudioSwapMainFaces"
+    "Node name for S&R": "StudioSwapFace"
    },
-   "title": "Face swap",
+   "title": "Face swap (asks which face when several)",
    "widgets_values": [
-    1,
-    false,
     false,
     1,
     0.5
@@ -2818,7 +2815,7 @@
   },
   {
    "id": 62,
-   "type": "SaveImage",
+   "type": "StudioSaveImageWithPrompt",
    "pos": [
     2340,
     0
@@ -2843,18 +2840,43 @@
      "widget": {
       "name": "filename_prefix"
      }
-    }
-   ],
-   "outputs": [
+    },
     {
-     "name": "images",
-     "type": "IMAGE",
-     "slot_index": 0,
-     "links": []
+     "name": "prompt_text",
+     "type": "STRING",
+     "link": 106,
+     "widget": {
+      "name": "prompt_text"
+     }
+    },
+    {
+     "name": "prompt_used",
+     "type": "STRING",
+     "link": 107,
+     "widget": {
+      "name": "prompt_used"
+     }
+    },
+    {
+     "name": "negative",
+     "type": "STRING",
+     "link": 108,
+     "widget": {
+      "name": "negative"
+     }
+    },
+    {
+     "name": "model",
+     "type": "STRING",
+     "link": 109,
+     "widget": {
+      "name": "model"
+     }
     }
    ],
+   "outputs": [],
    "properties": {
-    "Node name for S&R": "SaveImage"
+    "Node name for S&R": "StudioSaveImageWithPrompt"
    },
    "title": "Result",
    "widgets_values": [
@@ -3701,6 +3723,38 @@
    0,
    62,
    1,
+   "STRING"
+  ],
+  [
+   106,
+   2,
+   0,
+   62,
+   2,
+   "STRING"
+  ],
+  [
+   107,
+   11,
+   4,
+   62,
+   3,
+   "STRING"
+  ],
+  [
+   108,
+   11,
+   5,
+   62,
+   4,
+   "STRING"
+  ],
+  [
+   109,
+   11,
+   6,
+   62,
+   5,
    "STRING"
   ]
  ],

@@ -76,6 +76,33 @@ ENHANCE_EDIT_SYSTEM = (
     "background, the composition and the framing, unless the user asked to change them. "
     "Output only the instruction.")
 
+# For YouTube thumbnails (Z-Image Turbo, which renders text well).
+THUMBNAIL_SYSTEM = (
+    "You write the prompt for one YouTube thumbnail for an AI image model. Write one paragraph of 60 to "
+    "110 words, only in English words: no lists, no preamble. Keep the user's subject and idea. Make it a "
+    "click-worthy thumbnail: one clear focal subject, large in the frame (usually a person with a strong, "
+    "readable emotion, or the key object), a simple bold background with saturated colors and strong "
+    "contrast, rim lighting and depth so the subject pops. If text for the thumbnail is given: put the "
+    "subject in the left or right third of the frame and the text in the free space on the other side, "
+    "so nothing overlaps it; write the text exactly once, word for word, in double quotes, as huge bold "
+    "sans-serif letters with a thick dark outline, on at most two lines. If no text is given, the "
+    "thumbnail has no text. No logos, watermarks or other words. Output only the prompt.")
+
+
+def english_only(text):
+    """Small Qwen models sometimes slip a Chinese word into English; Z-Image would draw it."""
+    return re.sub(r"\s{2,}", " ", re.sub(r"[　-鿿가-힯＀-￯]+", " ", text)).strip()
+
+# The chat assistant (Chat node, Qwen3.5-4B, which also sees pictures).
+CHAT_SYSTEM = (
+    "You are the creative assistant in AI Studio, a private image studio running on the user's own "
+    "computer. You help the user develop characters, scenes and ideas, and write prompts for image models. "
+    "Be friendly and direct, and answer in the user's language. When the user asks for a prompt, or one "
+    "would help, write it as a single paragraph on its own after a line that says exactly 'Prompt:', with "
+    "rich visual detail (appearance, body, clothing, pose, expression, setting, lighting, camera and lens, "
+    "style), ready to paste into an image generator. When the user shares a picture, look at it carefully "
+    "and use what you see. Keep a character's details consistent across the conversation.")
+
 ANIME_TAGS = "masterpiece, high score, great score, absurdres"
 ANIME_NEGATIVE = ("lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, "
                   "fewer digits, cropped, worst quality, low quality, low score, bad score, "
@@ -193,13 +220,87 @@ class EnhancePrompt:
         tokens = clip.tokenize(prompt, min_length=1, thinking=False, system_prompt=system)
         ids = clip.generate(tokens, do_sample=True, max_length=256, temperature=0.6, top_k=64,
                             top_p=0.95, min_p=0.05, repetition_penalty=1.05, seed=0)
-        text = clip.decode(ids).split("</think>")[-1].strip().strip('"').strip()
+        text = english_only(clip.decode(ids).split("</think>")[-1]).strip('"').strip()
         print(f"[Enhance prompt] {text}")
         return (text or prompt,)
 
 
+class ThumbnailPrompt:
+    """Writes a YouTube thumbnail prompt from an idea and the text to show on it. The text
+    always ends up word for word in the prompt: it is added back if the writer changed it."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {
+            "clip": ("CLIP",),
+            "idea": ("STRING", {"multiline": True}),
+            "text": ("STRING", {"default": "", "tooltip": "Words on the thumbnail (empty: none)."}),
+            "enhance": ("BOOLEAN", {"default": True}),
+        }}
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("prompt",)
+    FUNCTION = "write"
+    CATEGORY = "studio"
+
+    def write(self, clip, idea, text, enhance):
+        text = text.strip().strip('"').strip()
+        if enhance:
+            request = f"Idea: {idea.strip()}\nText on the thumbnail: {text or 'none'}"
+            tokens = clip.tokenize(request, min_length=1, thinking=False, system_prompt=THUMBNAIL_SYSTEM)
+            ids = clip.generate(tokens, do_sample=True, max_length=256, temperature=0.6, top_k=64,
+                                top_p=0.95, min_p=0.05, repetition_penalty=1.05, seed=0)
+            prompt = english_only(clip.decode(ids).split("</think>")[-1])
+        else:
+            prompt = f"YouTube thumbnail, 16:9, bold and high contrast. {idea.strip()}"
+            if not text:
+                prompt += " No text."
+        if text and f'"{text}"'.lower() not in prompt.lower():
+            prompt += (f' Huge bold sans-serif text "{text}" with a thick dark outline, '
+                       "placed where it does not cover any face.")
+        print(f"[Thumbnail prompt] {prompt}")
+        return (prompt,)
+
+
+class Chat:
+    """One reply from the chat assistant. The earlier conversation comes in as text
+    ("User: ..." / "Assistant: ..." lines, as the phone app keeps it); a picture, when
+    given, is shown to the model with the message."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "clip": ("CLIP",),
+                "message": ("STRING", {"multiline": True}),
+                "history": ("STRING", {"multiline": True, "default": ""}),
+                "max_length": ("INT", {"default": 1024, "min": 64, "max": 4096}),
+                # A new seed gives a new answer (and keeps ComfyUI from reusing the last one).
+                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff, "control_after_generate": True}),
+            },
+            "optional": {"image": ("IMAGE",)},
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("reply",)
+    FUNCTION = "reply"
+    CATEGORY = "studio"
+
+    def reply(self, clip, message, history, max_length, seed, image=None):
+        text = message.strip()
+        if history.strip():
+            text = f"Our conversation so far:\n{history.strip()}\n\nMy new message:\n{text}"
+        tokens = clip.tokenize(text, image=image, min_length=1, thinking=False, system_prompt=CHAT_SYSTEM)
+        ids = clip.generate(tokens, do_sample=True, max_length=max_length, temperature=0.7, top_k=64,
+                            top_p=0.95, min_p=0.05, repetition_penalty=1.05, seed=seed)
+        return (clip.decode(ids).split("</think>")[-1].strip(),)
+
+
 NODE_CLASS_MAPPINGS = {"StudioPickModel": PickModel, "StudioLoadCheckpointByName": LoadCheckpointByName,
-                       "StudioEnhancePrompt": EnhancePrompt}
+                       "StudioEnhancePrompt": EnhancePrompt, "StudioThumbnailPrompt": ThumbnailPrompt,
+                       "StudioChat": Chat}
 NODE_DISPLAY_NAME_MAPPINGS = {"StudioPickModel": "Pick model (from the prompt)",
                               "StudioLoadCheckpointByName": "Load checkpoint by name",
-                              "StudioEnhancePrompt": "Enhance prompt (Qwen3)"}
+                              "StudioEnhancePrompt": "Enhance prompt (Qwen3)",
+                              "StudioThumbnailPrompt": "YouTube thumbnail prompt (Qwen3)",
+                              "StudioChat": "Chat (Qwen3.5)"}

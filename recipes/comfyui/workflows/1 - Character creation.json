@@ -1,6 +1,6 @@
 {
  "last_node_id": 19,
- "last_link_id": 20,
+ "last_link_id": 21,
  "nodes": [
   {
    "id": 1,
@@ -20,7 +20,7 @@
    "outputs": [],
    "properties": {},
    "widgets_values": [
-    "1. Give the character a name, describe the body and the clothes.\n2. Upload a clear photo of the face in 'Face', or turn 'Use face photo' off to keep the generated face ('Face' then just needs any image).\n3. Queue. The image is saved as outputs/comfyui/models/<Name>_00001_.png\n\nThe framing (full body, front view, plain background) is fixed so the image works well as the character's reference in the 'Pose scene' workflow.\nChange the seed for a different variation of the same description."
+    "1. Give the character a name, describe the body and the clothes.\n2. Upload a clear photo of the face in 'Face', or turn 'Use face photo' off to keep the generated face ('Face' then just needs any image).\n3. Queue. The image is saved in its own folder, outputs/comfyui/models/<Name>_00001/, with the prompt it was made with (prompt.txt).\n\nThe framing (full body, front view, plain background) is fixed so the image works well as the character's reference in the 'Pose scene' workflow.\nChange the seed for a different variation of the same description."
    ],
    "title": "How to use",
    "color": "#432",
@@ -322,7 +322,8 @@
      "type": "STRING",
      "slot_index": 0,
      "links": [
-      7
+      7,
+      21
      ]
     }
    ],
@@ -769,7 +770,7 @@
   },
   {
    "id": 19,
-   "type": "SaveImage",
+   "type": "StudioSaveImageWithPrompt",
    "pos": [
     2040,
     0
@@ -794,18 +795,19 @@
      "widget": {
       "name": "filename_prefix"
      }
-    }
-   ],
-   "outputs": [
+    },
     {
-     "name": "images",
-     "type": "IMAGE",
-     "slot_index": 0,
-     "links": []
+     "name": "prompt_text",
+     "type": "STRING",
+     "link": 21,
+     "widget": {
+      "name": "prompt_text"
+     }
     }
    ],
+   "outputs": [],
    "properties": {
-    "Node name for S&R": "SaveImage"
+    "Node name for S&R": "StudioSaveImageWithPrompt"
    },
    "title": "Character",
    "widgets_values": [
@@ -972,6 +974,14 @@
    0,
    19,
    1,
+   "STRING"
+  ],
+  [
+   21,
+   9,
+   0,
+   19,
+   2,
    "STRING"
   ]
  ],

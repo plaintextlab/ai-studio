@@ -11,8 +11,9 @@ import org.json.JSONObject
  *   Z-Image Turbo  realistic people, also several interacting
  *   Lustify        explicit adult content (newest version on the server)
  *   Animagine      anime and illustration
- * The saved file is named after the model ([modelName] reads it back). A prompt
- * enhancer (Qwen3-4B, on the server) can rewrite the prompt in detail first.
+ * Each image is saved in its own folder on the PC with its prompt (prompt.txt), named after
+ * the model ([modelName] reads it back). A prompt enhancer (Qwen3-4B, on the server) can
+ * rewrite the prompt in detail first.
  */
 object Workflow {
     private const val NEGATIVE =
@@ -29,9 +30,12 @@ object Workflow {
         "animagine" to "Animagine",
     )
 
-    /** "android_z-image_00001_.png" -> "Z-Image Turbo" */
+    /** "android_z-image_00001.png" (or the older "android_z-image_00001_.png") -> "Z-Image Turbo" */
     fun modelName(filename: String): String? =
-        Regex("^android_(.+?)_\\d+_\\.png$").find(filename)?.groupValues?.get(1)?.let { MODEL_NAMES[it] ?: it }
+        Regex("^android_(.+?)_\\d+_?\\.png$").find(filename)?.groupValues?.get(1)?.let(::modelLabel)
+
+    /** "z-image" (Pick model's label) -> "Z-Image Turbo" */
+    fun modelLabel(slug: String): String = MODEL_NAMES[slug] ?: slug
 
     /** Node whose output is the prompt actually used (shown under the image). */
     const val PROMPT_USED_NODE = "74"
@@ -40,11 +44,13 @@ object Workflow {
      * [editImage]: name of an uploaded picture to edit, or null for a new image.
      * [enhance]: rewrite the prompt first with the studio's Qwen3-4B prompt enhancer (a
      * detailed scene for new images, a precise instruction for edits).
-     * [faceImage]: name of an uploaded face photo to put on the main person, or null.
+     * [faceImage]: name of an uploaded face photo to put in, or null. With several faces in a
+     * picture the server asks which one (see [ComfyClient.faceQuestions]).
+     * [count]: images per run.
      */
     fun build(
         prompt: String, width: Int, height: Int, editImage: String?, seed: Long, enhance: Boolean,
-        faceImage: String?,
+        faceImage: String?, count: Int,
     ): JSONObject {
         val w = JSONObject()
         fun node(id: String, type: String, vararg inputs: Pair<String, Any>) {
@@ -94,7 +100,7 @@ object Workflow {
         node("21", "RandomNoise", "noise_seed" to seed)
         node("22", "KSamplerSelect", "sampler_name" to "euler")
         node("23", "Flux2Scheduler", "steps" to 4, "width" to outWidth, "height" to outHeight)
-        node("24", "EmptyFlux2LatentImage", "width" to outWidth, "height" to outHeight, "batch_size" to 1)
+        node("24", "EmptyFlux2LatentImage", "width" to outWidth, "height" to outHeight, "batch_size" to count)
         node("25", "SamplerCustomAdvanced", "noise" to link("21"), "guider" to link("20"),
             "sampler" to link("22"), "sigmas" to link("23"), "latent_image" to link("24"))
         node("26", "VAEDecode", "samples" to link("25"), "vae" to link("3"))
@@ -106,7 +112,7 @@ object Workflow {
         node("43", "ModelSamplingAuraFlow", "model" to link("40"), "shift" to 3)
         node("44", "CLIPTextEncode", "clip" to link("41"), "text" to link("30", 4))
         node("45", "CLIPTextEncode", "clip" to link("41"), "text" to link("30", 5))
-        node("46", "EmptySD3LatentImage", "width" to width, "height" to height, "batch_size" to 1)
+        node("46", "EmptySD3LatentImage", "width" to width, "height" to height, "batch_size" to count)
         node("47", "KSampler", "model" to link("43"), "positive" to link("44"), "negative" to link("45"),
             "latent_image" to link("46"), "seed" to seed, "steps" to 8, "cfg" to 1.0,
             "sampler_name" to "res_multistep", "scheduler" to "simple", "denoise" to 1.0)
@@ -118,7 +124,7 @@ object Workflow {
             node(id(0), "StudioLoadCheckpointByName", "ckpt_name" to link("30", 3))
             node(id(1), "CLIPTextEncode", "clip" to link(id(0), 1), "text" to link("30", 4))
             node(id(2), "CLIPTextEncode", "clip" to link(id(0), 1), "text" to link("30", 5))
-            node(id(3), "EmptyLatentImage", "width" to width, "height" to height, "batch_size" to 1)
+            node(id(3), "EmptyLatentImage", "width" to width, "height" to height, "batch_size" to count)
             node(id(4), "KSampler", "model" to link(id(0)), "positive" to link(id(1)), "negative" to link(id(2)),
                 "latent_image" to link(id(3)), "seed" to seed, "steps" to steps, "cfg" to cfg,
                 "sampler_name" to sampler, "scheduler" to scheduler, "denoise" to 1.0)
@@ -134,17 +140,93 @@ object Workflow {
         node("72", "ComfySwitchNode", "switch" to link("30", 0), "on_false" to link("71"), "on_true" to link("48"))
         node("73", "StringConcatenate", "string_a" to "images/android_", "string_b" to link("30", 6), "delimiter" to "")
 
-        // Face swap onto the main person (the largest face, so people in the background
-        // keep theirs), through ReActor; ReActor itself skips images it finds explicit.
+        // Face swap through ReActor (which itself skips images it finds explicit): one face
+        // is replaced right away; with several the node waits until the app says which.
         var image = link("72")
         if (faceImage != null) {
             node("80", "LoadImage", "image" to faceImage)
-            node("81", "StudioSwapMainFaces", "image" to image, "model_1_face" to link("80"),
-                "main_people" to 1, "swap_model_1" to true, "swap_model_2" to false,
+            node("81", "StudioSwapFace", "image" to image, "face" to link("80"), "enabled" to true,
                 "face_restore_visibility" to 1.0, "codeformer_weight" to 0.5)
             image = link("81")
         }
-        node("27", "SaveImage", "images" to image, "filename_prefix" to link("73"))
+        node("27", "StudioSaveImageWithPrompt", "images" to image, "filename_prefix" to link("73"),
+            "prompt_text" to prompt, "prompt_used" to link("30", 4), "negative" to link("30", 5),
+            "model" to link("30", 6))
+        return w
+    }
+
+    /** Node whose output is a thumbnail's prompt. */
+    const val THUMBNAIL_PROMPT_NODE = "6"
+
+    /**
+     * The studio's "4 - YouTube thumbnail" workflow: Z-Image Turbo (it renders text best) at
+     * 1280x720. The studio's thumbnail writer turns [idea] into a thumbnail prompt and puts
+     * [text] on it word for word ([enhance] off: a plain prompt). [faceImage]: an uploaded face
+     * to put in, or null. [count]: thumbnails per run.
+     */
+    fun buildThumbnail(
+        idea: String, text: String, seed: Long, enhance: Boolean, faceImage: String?, count: Int,
+    ): JSONObject {
+        val w = JSONObject()
+        fun node(id: String, type: String, vararg inputs: Pair<String, Any>) {
+            val i = JSONObject()
+            for ((k, v) in inputs) i.put(k, v)
+            w.put(id, JSONObject().put("class_type", type).put("inputs", i))
+        }
+        fun link(id: String, slot: Int = 0) = JSONArray().put(id).put(slot)
+
+        node("1", "UNETLoader", "unet_name" to "z_image_turbo_bf16.safetensors", "weight_dtype" to "default")
+        node("2", "CLIPLoader", "clip_name" to "qwen_3_4b.safetensors", "type" to "lumina2", "device" to "default")
+        node("3", "VAELoader", "vae_name" to "ae.safetensors")
+        node("4", "ModelSamplingAuraFlow", "model" to link("1"), "shift" to 3)
+        node("5", "StudioThumbnailPrompt", "clip" to link("2"), "idea" to idea, "text" to text, "enhance" to enhance)
+        node(THUMBNAIL_PROMPT_NODE, "PreviewAny", "source" to link("5"))
+        node("7", "CLIPTextEncode", "clip" to link("2"), "text" to link("5"))
+        node("8", "CLIPTextEncode", "clip" to link("2"), "text" to "")
+        node("9", "EmptySD3LatentImage", "width" to 1280, "height" to 720, "batch_size" to count)
+        node("10", "KSampler", "model" to link("4"), "positive" to link("7"), "negative" to link("8"),
+            "latent_image" to link("9"), "seed" to seed, "steps" to 8, "cfg" to 1.0,
+            "sampler_name" to "res_multistep", "scheduler" to "simple", "denoise" to 1.0)
+        node("11", "VAEDecode", "samples" to link("10"), "vae" to link("3"))
+        var image = link("11")
+        if (faceImage != null) {
+            node("12", "LoadImage", "image" to faceImage)
+            node("13", "StudioSwapFace", "image" to image, "face" to link("12"), "enabled" to true,
+                "face_restore_visibility" to 1.0, "codeformer_weight" to 0.5)
+            image = link("13")
+        }
+        node("14", "StudioSaveImageWithPrompt", "images" to image, "filename_prefix" to "thumbnails/android",
+            "prompt_text" to idea, "prompt_used" to link("5"), "text" to text)
+        return w
+    }
+
+    /** Node whose output is the chat assistant's reply. */
+    const val CHAT_REPLY_NODE = "4"
+
+    /**
+     * One reply from the studio's chat assistant (Qwen3.5-4B, which sees pictures). [history]
+     * is the conversation so far as "User:" / "Assistant:" lines; [image] an uploaded picture
+     * for it to look at, or null.
+     */
+    fun buildChat(message: String, history: String, image: String?, seed: Long): JSONObject {
+        val w = JSONObject()
+        fun node(id: String, type: String, vararg inputs: Pair<String, Any>) {
+            val i = JSONObject()
+            for ((k, v) in inputs) i.put(k, v)
+            w.put(id, JSONObject().put("class_type", type).put("inputs", i))
+        }
+        fun link(id: String, slot: Int = 0) = JSONArray().put(id).put(slot)
+
+        node("1", "CLIPLoader", "clip_name" to "qwen3.5_4b_bf16.safetensors", "type" to "stable_diffusion",
+            "device" to "default")
+        val inputs = mutableListOf<Pair<String, Any>>("clip" to link("1"), "message" to message,
+            "history" to history, "max_length" to 1024, "seed" to seed)
+        if (image != null) {
+            node("2", "LoadImage", "image" to image)
+            inputs += "image" to link("2")
+        }
+        node("3", "StudioChat", *inputs.toTypedArray())
+        node(CHAT_REPLY_NODE, "PreviewAny", "source" to link("3"))
         return w
     }
 }

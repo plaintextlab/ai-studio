@@ -5,12 +5,15 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,17 +33,22 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
@@ -62,6 +70,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -77,7 +86,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 private val SUGGESTIONS = listOf(
     "A lighthouse on a cliff at sunset, realistic photo",
@@ -85,13 +97,21 @@ private val SUGGESTIONS = listOf(
     "Portrait of an old fisherman, soft window light",
 )
 
+private val THUMBNAIL_SUGGESTIONS = listOf(
+    "Cooking the spiciest ramen in the world" to "WORLDS HOTTEST RAMEN",
+    "Travel vlog: a night in Tokyo on a budget" to "TOKYO ON $20",
+    "Testing a new phone camera against a DSLR" to "PHONE VS PRO",
+)
+
+/** The Image tab (Quick image) and the Thumbnail tab. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StudioScreen(vm: StudioViewModel) {
-    var showSettings by rememberSaveable { mutableStateOf(vm.server.isBlank()) }
+fun StudioScreen(vm: StudioViewModel, mode: Mode, onOpenSettings: () -> Unit, onEditInImageTab: () -> Unit) {
+    val thumbnail = mode == Mode.Thumbnail
+    val turns = vm.turnsFor(mode)
     var viewing by remember { mutableStateOf<Result?>(null) }
-    var text by rememberSaveable { mutableStateOf("") }
     val snackbar = remember { SnackbarHostState() }
+    val editResult = { r: Result -> vm.editResult(r); if (thumbnail) onEditInImageTab() }
     val listState = rememberLazyListState()
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) vm.attach(uri)
@@ -103,16 +123,21 @@ fun StudioScreen(vm: StudioViewModel) {
     LaunchedEffect(vm.message) {
         vm.message?.let { snackbar.showSnackbar(it); vm.message = null }
     }
-    LaunchedEffect(vm.turns.size) {
-        if (vm.turns.isNotEmpty()) listState.animateScrollToItem(vm.turns.size - 1)
+    // Open at the newest request, and follow new ones (not older ones brought in from the PC).
+    var scrolledOnce by remember { mutableStateOf(false) }
+    LaunchedEffect(turns.lastOrNull()?.id) {
+        if (turns.isEmpty()) return@LaunchedEffect
+        if (scrolledOnce) listState.animateScrollToItem(turns.size - 1) else listState.scrollToItem(turns.size - 1)
+        scrolledOnce = true
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("AI Studio") },
+                title = { Text(if (thumbnail) "YouTube thumbnail" else "AI Studio") },
                 actions = {
-                    IconButton(onClick = { showSettings = true }) {
+                    IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
                 },
@@ -122,16 +147,20 @@ fun StudioScreen(vm: StudioViewModel) {
         bottomBar = {
             InputBar(
                 vm = vm,
-                text = text,
-                onText = { text = it },
+                mode = mode,
                 onPick = { pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 onPickFace = { pickFace.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                onSend = { vm.send(text); text = "" },
+                onSend = {
+                    if (thumbnail) vm.sendThumbnail(vm.thumbnailIdea, vm.thumbnailText).also { vm.thumbnailIdea = "" }
+                    else vm.send(vm.imageDraft).also { vm.imageDraft = "" }
+                },
             )
         },
     ) { padding ->
-        if (vm.turns.isEmpty()) {
-            EmptyState(Modifier.padding(padding)) { text = it }
+        if (turns.isEmpty()) {
+            EmptyState(Modifier.padding(padding), mode) { idea, text ->
+                if (thumbnail) { vm.thumbnailIdea = idea; vm.thumbnailText = text } else vm.imageDraft = idea
+            }
         } else {
             LazyColumn(
                 state = listState,
@@ -139,13 +168,15 @@ fun StudioScreen(vm: StudioViewModel) {
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.fillMaxSize().padding(padding),
             ) {
-                items(vm.turns, key = { it.id }) { turn ->
+                items(turns, key = { it.id }) { turn ->
                     TurnItem(
                         turn = turn,
                         onOpen = { viewing = it },
                         onSave = vm::save,
-                        onEdit = vm::editResult,
+                        onEdit = editResult,
                         onRetry = { vm.retry(turn) },
+                        onChooseFace = { vm.chooseFace(turn, it) },
+                        onAgain = { vm.again(turn) },
                     )
                 }
             }
@@ -154,32 +185,36 @@ fun StudioScreen(vm: StudioViewModel) {
 
     viewing?.let { result ->
         Viewer(result, onClose = { viewing = null }, onSave = { vm.save(result) },
-            onEdit = { vm.editResult(result); viewing = null })
-    }
-    if (showSettings) {
-        SettingsDialog(vm, onClose = { showSettings = false })
+            onEdit = { editResult(result); viewing = null })
     }
 }
 
 @Composable
-private fun EmptyState(modifier: Modifier, onSuggestion: (String) -> Unit) {
+private fun EmptyState(modifier: Modifier, mode: Mode, onSuggestion: (String, String) -> Unit) {
+    val thumbnail = mode == Mode.Thumbnail
     Column(
         modifier = modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.primary)
+        Icon(if (thumbnail) Icons.Filled.Movie else Icons.Filled.AutoAwesome, contentDescription = null,
+            modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(16.dp))
-        Text("What do you want to create?", style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center)
+        Text(if (thumbnail) "What is your video about?" else "What do you want to create?",
+            style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
-        Text("Describe an image, or add a photo and say what to change.",
+        Text(
+            if (thumbnail) "Describe the video and type the words for the thumbnail. They come out exactly as typed."
+            else "Describe an image, or add a photo and say what to change.",
             style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))
-        SUGGESTIONS.forEach {
-            AssistChip(onClick = { onSuggestion(it) }, label = { Text(it) })
+        if (thumbnail) {
+            THUMBNAIL_SUGGESTIONS.forEach { (idea, text) ->
+                AssistChip(onClick = { onSuggestion(idea, text) }, label = { Text("$idea: \"$text\"") })
+            }
+        } else {
+            SUGGESTIONS.forEach { AssistChip(onClick = { onSuggestion(it, "") }, label = { Text(it) }) }
         }
     }
 }
@@ -191,6 +226,8 @@ private fun TurnItem(
     onSave: (Result) -> Unit,
     onEdit: (Result) -> Unit,
     onRetry: () -> Unit,
+    onChooseFace: (Int) -> Unit,
+    onAgain: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
         // The request, on the right like a sent message.
@@ -206,7 +243,12 @@ private fun TurnItem(
                         modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)))
                     Spacer(Modifier.size(10.dp))
                 }
-                Text(turn.prompt, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f, fill = false))
+                // Long prompts show 6 lines: tap to read them all.
+                var expanded by remember { mutableStateOf(false) }
+                Text(if (turn.text.isNotBlank()) "${turn.prompt}\n\"${turn.text}\"" else turn.prompt,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = if (expanded) Int.MAX_VALUE else 6, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false).clickable { expanded = !expanded })
                 turn.face?.let {
                     Spacer(Modifier.size(10.dp))
                     Image(it.preview.asImageBitmap(), contentDescription = "Face used",
@@ -216,36 +258,55 @@ private fun TurnItem(
         }
         Spacer(Modifier.height(10.dp))
         when (turn.state) {
-            Turn.State.Waiting, Turn.State.Working -> Pending(turn)
+            Turn.State.Waiting, Turn.State.Working ->
+                turn.question?.let { FaceChoice(it, onChooseFace) } ?: Pending(turn)
             Turn.State.Failed -> Failed(turn.error.orEmpty(), onRetry)
-            Turn.State.Done -> turn.result?.let { result ->
-                Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
-                    Image(
-                        result.bitmap.asImageBitmap(), contentDescription = turn.prompt,
-                        contentScale = ContentScale.FillWidth,
-                        modifier = Modifier.fillMaxWidth()
-                            .aspectRatio(result.bitmap.width.toFloat() / result.bitmap.height)
-                            .clickable { onOpen(result) },
-                    )
+            Turn.State.Done -> turn.results.firstOrNull()?.let { first ->
+                if (turn.results.size == 1) {
+                    Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+                        ResultImage(first, turn.shape, turn.prompt, Modifier.fillMaxWidth()) { onOpen(first) }
+                    }
+                } else {
+                    // Several images: two per row; tap one to save or edit it.
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        turn.results.chunked(2).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                row.forEach { r ->
+                                    Card(shape = RoundedCornerShape(14.dp), modifier = Modifier.weight(1f)) {
+                                        ResultImage(r, turn.shape, turn.prompt, Modifier.fillMaxWidth()) { onOpen(r) }
+                                    }
+                                }
+                                if (row.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
                 }
                 Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { onSave(result) }) {
-                        Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.size(6.dp)); Text("Save")
+                    if (turn.results.size == 1) {
+                        TextButton(onClick = { onSave(first) }) {
+                            Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(6.dp)); Text("Save")
+                        }
+                        TextButton(onClick = { onEdit(first) }) {
+                            Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(6.dp)); Text("Edit this")
+                        }
+                    } else {
+                        Text("Tap a picture to save or edit it", style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(12.dp))
                     }
-                    TextButton(onClick = { onEdit(result) }) {
-                        Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.size(6.dp)); Text("Edit this")
+                    IconButton(onClick = onAgain) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Again: same prompt, new images")
                     }
                     Spacer(Modifier.weight(1f))
-                    result.model?.let {
+                    first.model?.let {
                         Text(it, style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(end = 8.dp))
                     }
                 }
                 // The enhanced prompt, when the enhancer rewrote it: tap to read it all.
-                result.promptUsed?.takeIf { it.isNotBlank() && it != turn.prompt }?.let { used ->
+                first.promptUsed?.takeIf { it.isNotBlank() && it != turn.prompt }?.let { used ->
                     var expanded by remember { mutableStateOf(false) }
                     Text(
                         "Enhanced prompt: $used",
@@ -276,11 +337,75 @@ private fun Pending(turn: Turn) {
             Text(
                 when {
                     turn.state == Turn.State.Waiting -> "Waiting for ComfyUI…"
+                    turn.mode == Mode.Thumbnail && turn.count > 1 -> "Designing ${turn.count} thumbnails…"
+                    turn.mode == Mode.Thumbnail -> "Designing your thumbnail…"
+                    turn.input != null && turn.count > 1 -> "Making ${turn.count} edits…"
                     turn.input != null -> "Editing…"
+                    turn.count > 1 -> "Creating ${turn.count} images…"
                     else -> "Creating…"
                 },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/** A result, loaded from the history in the background (a placeholder of [shape] till then). */
+@Composable
+private fun ResultImage(result: Result, shape: Shape, description: String, modifier: Modifier, onClick: () -> Unit) {
+    val bitmap = rememberBitmap(result.file)
+    if (bitmap == null) {
+        Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = modifier.aspectRatio(shape.width.toFloat() / shape.height)) {}
+    } else {
+        Image(
+            bitmap.asImageBitmap(), contentDescription = description, contentScale = ContentScale.FillWidth,
+            modifier = modifier.aspectRatio(bitmap.width.toFloat() / bitmap.height).clickable(onClick = onClick),
+        )
+    }
+}
+
+@Composable
+private fun rememberBitmap(file: File, maxSide: Int = 1080): android.graphics.Bitmap? {
+    val bitmap by produceState<android.graphics.Bitmap?>(null, file, maxSide) {
+        value = withContext(Dispatchers.IO) { runCatching { Images.load(file, maxSide) }.getOrNull() }
+    }
+    return bitmap
+}
+
+/** The PC found several faces in a picture: which one gets the chosen face? */
+@Composable
+private fun FaceChoice(question: FaceQuestion, onChoose: (Int) -> Unit) {
+    Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                "Which face should be replaced?" +
+                    if (question.pictures > 1) " (picture ${question.picture} of ${question.pictures})" else "",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Image(
+                question.image.asImageBitmap(), contentDescription = "The picture, with its faces numbered",
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier.fillMaxWidth()
+                    .aspectRatio(question.image.width.toFloat() / question.image.height)
+                    .clip(RoundedCornerShape(12.dp)),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                question.faces.forEachIndexed { i, face ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { onChoose(i + 1) }.padding(4.dp),
+                    ) {
+                        Image(face.asImageBitmap(), contentDescription = "Face ${i + 1}", contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(88.dp).clip(RoundedCornerShape(12.dp)))
+                        Spacer(Modifier.height(4.dp))
+                        Text("Face ${i + 1}", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+            TextButton(onClick = { onChoose(0) }, modifier = Modifier.align(Alignment.End)) {
+                Text("Keep all faces")
+            }
         }
     }
 }
@@ -300,28 +425,45 @@ private fun Failed(error: String, onRetry: () -> Unit) {
 @Composable
 private fun InputBar(
     vm: StudioViewModel,
-    text: String,
-    onText: (String) -> Unit,
+    mode: Mode,
     onPick: () -> Unit,
     onPickFace: () -> Unit,
     onSend: () -> Unit,
 ) {
+    val thumbnail = mode == Mode.Thumbnail
+    val text = if (thumbnail) vm.thumbnailIdea else vm.imageDraft
+    val onText = { t: String -> if (thumbnail) vm.thumbnailIdea = t else vm.imageDraft = t }
     Surface(tonalElevation = 3.dp) {
-        Column(Modifier.navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Column(Modifier.imePadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
             vm.face?.let { face ->
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
                     Image(face.preview.asImageBitmap(), contentDescription = "Face to use",
                         contentScale = ContentScale.Crop, modifier = Modifier.size(40.dp).clip(CircleShape))
                     Spacer(Modifier.size(12.dp))
-                    Text("This face goes on the main person", modifier = Modifier.weight(1f),
+                    Text("This face goes on the person (you pick which when there are several)",
+                        modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyMedium)
                     IconButton(onClick = vm::clearFace) {
                         Icon(Icons.Filled.Close, contentDescription = "Stop using this face")
                     }
                 }
             }
-            val attachment = vm.attachment
-            if (attachment != null) {
+            val attachment = if (thumbnail) null else vm.attachment
+            if (thumbnail) {
+                TextField(
+                    value = vm.thumbnailText,
+                    onValueChange = { vm.thumbnailText = it },
+                    placeholder = { Text("Words on the thumbnail (optional)") },
+                    leadingIcon = { Icon(Icons.Filled.TextFields, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(28.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                )
+            } else if (attachment != null) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
                     Image(attachment.preview.asImageBitmap(), contentDescription = "Picture to edit",
                         contentScale = ContentScale.Crop,
@@ -333,16 +475,30 @@ private fun InputBar(
                         Icon(Icons.Filled.Close, contentDescription = "Remove picture")
                     }
                 }
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 4.dp)) {
-                    Shape.entries.forEach { s ->
-                        FilterChip(selected = vm.shape == s, onClick = { vm.shape = s }, label = { Text(s.label) })
+            }
+            // Shape (new images only) and how many images per run.
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+            ) {
+                if (!thumbnail && attachment == null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
+                        Shape.entries.filter { it != Shape.Thumbnail }.forEach { s ->
+                            FilterChip(selected = vm.shape == s, onClick = { vm.shape = s }, label = { Text(s.label) })
+                        }
                     }
+                } else {
+                    Spacer(Modifier.weight(1f))
                 }
+                CountChip(vm.count, vm::updateCount)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onPick) {
-                    Icon(Icons.Filled.AddPhotoAlternate, contentDescription = "Add a picture to edit")
+                if (!thumbnail) {
+                    IconButton(onClick = onPick) {
+                        Icon(Icons.Filled.AddPhotoAlternate, contentDescription = "Add a picture to edit")
+                    }
                 }
                 IconButton(onClick = onPickFace) {
                     Icon(Icons.Filled.Face, contentDescription = "Choose a face to swap in")
@@ -350,7 +506,13 @@ private fun InputBar(
                 TextField(
                     value = text,
                     onValueChange = onText,
-                    placeholder = { Text(if (attachment != null) "Describe the change" else "Describe an image") },
+                    placeholder = {
+                        Text(when {
+                            thumbnail -> "What is the video about?"
+                            attachment != null -> "Describe the change"
+                            else -> "Describe an image"
+                        })
+                    },
                     shape = RoundedCornerShape(28.dp),
                     colors = TextFieldDefaults.colors(
                         focusedIndicatorColor = Color.Transparent,
@@ -368,13 +530,36 @@ private fun InputBar(
     }
 }
 
+/** "2 images": how many images each request makes. */
+@Composable
+private fun CountChip(count: Int, onChange: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        AssistChip(
+            onClick = { open = true },
+            label = { Text(if (count == 1) "1 image" else "$count images") },
+            leadingIcon = { Icon(Icons.Filled.Collections, contentDescription = null, modifier = Modifier.size(18.dp)) },
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            IMAGE_COUNTS.forEach { n ->
+                DropdownMenuItem(
+                    text = { Text(if (n == 1) "1 image per run" else "$n images per run") },
+                    onClick = { onChange(n); open = false },
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun Viewer(result: Result, onClose: () -> Unit, onSave: () -> Unit, onEdit: () -> Unit) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
             Box {
-                Image(result.bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize())
+                rememberBitmap(result.file, 2048)?.let {
+                    Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize())
+                }
                 IconButton(onClick = onClose, modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
                     Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)
                 }
@@ -395,7 +580,7 @@ private fun Viewer(result: Result, onClose: () -> Unit, onSave: () -> Unit, onEd
 }
 
 @Composable
-private fun SettingsDialog(vm: StudioViewModel, onClose: () -> Unit) {
+fun SettingsDialog(vm: StudioViewModel, onClose: () -> Unit) {
     var url by rememberSaveable { mutableStateOf(vm.server) }
     var status by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()

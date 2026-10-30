@@ -1,0 +1,277 @@
+{
+ "last_node_id": 6,
+ "last_link_id": 4,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Note",
+   "pos": [
+    0,
+    0
+   ],
+   "size": [
+    460,
+    260
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {},
+   "widgets_values": [
+    "Ask the assistant anything: describe a character, ask for a prompt for an image, or have it look at a picture (right-click the green group > Bypass Group Nodes to switch the picture on, and load one).\n\nFor conversations that are kept, use the Chat tab of the phone app; this is one question at a time. Runs Qwen3.5-4B on this computer."
+   ],
+   "title": "How to use",
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 2,
+   "type": "PrimitiveStringMultiline",
+   "pos": [
+    0,
+    300
+   ],
+   "size": [
+    460,
+    220
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "STRING",
+     "type": "STRING",
+     "slot_index": 0,
+     "links": [
+      2
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PrimitiveStringMultiline"
+   },
+   "title": "Your message",
+   "widgets_values": [
+    "Create a character: a 30-year-old woman who runs a mountain cafe. Describe her look and give me a prompt for a portrait of her."
+   ]
+  },
+  {
+   "id": 3,
+   "type": "CLIPLoader",
+   "pos": [
+    560,
+    0
+   ],
+   "size": [
+    340,
+    110
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "CLIP",
+     "type": "CLIP",
+     "slot_index": 0,
+     "links": [
+      1
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPLoader"
+   },
+   "widgets_values": [
+    "qwen3.5_4b_bf16.safetensors",
+    "stable_diffusion",
+    "default"
+   ]
+  },
+  {
+   "id": 4,
+   "type": "LoadImage",
+   "pos": [
+    0,
+    600
+   ],
+   "size": [
+    460,
+    400
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 4,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "slot_index": 0,
+     "links": [
+      3
+     ]
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "slot_index": 1,
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "title": "Reference picture",
+   "widgets_values": [
+    "example.jpg",
+    "image"
+   ]
+  },
+  {
+   "id": 5,
+   "type": "StudioChat",
+   "pos": [
+    560,
+    160
+   ],
+   "size": [
+    340,
+    140
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 1
+    },
+    {
+     "name": "message",
+     "type": "STRING",
+     "link": 2,
+     "widget": {
+      "name": "message"
+     }
+    },
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 3
+    }
+   ],
+   "outputs": [
+    {
+     "name": "reply",
+     "type": "STRING",
+     "slot_index": 0,
+     "links": [
+      4
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "StudioChat"
+   },
+   "title": "Assistant",
+   "widgets_values": [
+    "",
+    "",
+    1024
+   ]
+  },
+  {
+   "id": 6,
+   "type": "PreviewAny",
+   "pos": [
+    960,
+    0
+   ],
+   "size": [
+    700,
+    700
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "source",
+     "type": "*",
+     "link": 4
+    }
+   ],
+   "outputs": [
+    {
+     "name": "STRING",
+     "type": "STRING",
+     "slot_index": 0,
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewAny"
+   },
+   "title": "Reply"
+  }
+ ],
+ "links": [
+  [
+   1,
+   3,
+   0,
+   5,
+   0,
+   "CLIP"
+  ],
+  [
+   2,
+   2,
+   0,
+   5,
+   1,
+   "STRING"
+  ],
+  [
+   3,
+   4,
+   0,
+   5,
+   2,
+   "IMAGE"
+  ],
+  [
+   4,
+   5,
+   0,
+   6,
+   0,
+   "STRING"
+  ]
+ ],
+ "groups": [
+  {
+   "id": 1,
+   "title": "Reference picture (optional; off by default)",
+   "bounding": [
+    -20,
+    560,
+    500,
+    460
+   ],
+   "color": "#3f8f3f",
+   "font_size": 24,
+   "flags": {}
+  }
+ ],
+ "config": {},
+ "extra": {},
+ "version": 0.4
+}

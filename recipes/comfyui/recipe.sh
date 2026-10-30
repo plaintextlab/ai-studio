@@ -56,6 +56,7 @@ vae/flux2-vae.safetensors $HF/Comfy-Org/Flux-2-Klein-4B/resolve/main/split_files
 checkpoints/animagine-xl-4.0-opt.safetensors $HF/cagliostrolab/animagine-xl-4.0/resolve/main/animagine-xl-4.0-opt.safetensors 6327eca98bfb6538dd7a4edce22484a1bbc57a8cff6b11d075d40da1afb847ac
 checkpoints/lustifySDXLNSFW_oltFIXEDTEXTURES.safetensors $HF/MishGUN1/LUSTIFY/resolve/main/lustifySDXLNSFW_oltFIXEDTEXTURES.safetensors d7e7e35b0f60c42ad427ce81e30569a3881143ecf2f9cb50021a52947f69d22f
 model_patches/Z-Image-Turbo-Fun-Controlnet-Union-2.1-lite-2602-8steps.safetensors $HF/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Turbo-Fun-Controlnet-Union-2.1-lite-2602-8steps.safetensors 3ea098db9bd145be525c7e2366920b6d76c5ffd46b3d7aa8169bbc943fdaee35
+text_encoders/qwen3.5_4b_bf16.safetensors $HF/Comfy-Org/Qwen3.5/resolve/main/text_encoders/qwen3.5_4b_bf16.safetensors 9fb3ae42003750fe2d16350259a3ec07761d6d13a8e2b244a6e22fa9d8050841
 "
 
 # Arguments for launch.py (passed on to main.py), one per line.

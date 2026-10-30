@@ -16,6 +16,12 @@ data class OutputImage(val filename: String, val subfolder: String, val type: St
 /** What a finished prompt produced: its saved images, and text shown by preview nodes. */
 data class Finished(val images: List<OutputImage>, val texts: Map<String, String>)
 
+/** "Which face should be replaced?": the picture with its faces numbered, and each face. */
+class FaceQuestion(
+    val id: String, val picture: Int, val pictures: Int,
+    val image: android.graphics.Bitmap, val faces: List<android.graphics.Bitmap>,
+)
+
 /**
  * ComfyUI's HTTP API (the same one its web page uses). All calls block; run them off
  * the main thread.
@@ -28,11 +34,17 @@ class ComfyClient(baseUrl: String) {
         request("/system_stats").let { JSONObject(it.decodeToString()) }
             .getJSONObject("system").optString("comfyui_version", "?")
 
-    /** Uploads a picture into ComfyUI's input folder; returns the name to use in a workflow. */
-    fun uploadImage(jpeg: ByteArray, name: String): String {
+    /**
+     * Uploads a picture into ComfyUI's input folder (or a [subfolder] of it); returns the
+     * name to use in a workflow.
+     */
+    fun uploadImage(jpeg: ByteArray, name: String, subfolder: String = ""): String {
         val boundary = "----aistudio" + UUID.randomUUID()
         val body = buildString {
             append("--$boundary\r\nContent-Disposition: form-data; name=\"overwrite\"\r\n\r\ntrue\r\n")
+            if (subfolder.isNotEmpty()) {
+                append("--$boundary\r\nContent-Disposition: form-data; name=\"subfolder\"\r\n\r\n$subfolder\r\n")
+            }
             append("--$boundary\r\nContent-Disposition: form-data; name=\"image\"; filename=\"$name\"\r\n")
             append("Content-Type: image/jpeg\r\n\r\n")
         }.toByteArray() + jpeg + "\r\n--$boundary--\r\n".toByteArray()
@@ -75,16 +87,85 @@ class ComfyClient(baseUrl: String) {
         return Finished(images, texts)
     }
 
+    /**
+     * Waits for a queued prompt to finish. A busy PC can miss a status check now and then,
+     * so short outages are ridden out; only ~30 s without an answer counts as a failure.
+     * [onWaiting] is told whether the prompt is still queued behind others.
+     */
+    suspend fun await(promptId: String, onWaiting: suspend (Boolean) -> Unit = {}): Finished {
+        var misses = 0
+        while (true) {
+            try {
+                result(promptId)?.let { return it }
+                onWaiting(isWaiting(promptId))
+                misses = 0
+            } catch (e: ComfyException) {
+                throw e
+            } catch (e: IOException) {
+                if (++misses >= 10) throw e
+            }
+            kotlinx.coroutines.delay(if (misses == 0) 700L else 3000L)
+        }
+    }
+
     /** True while the prompt is still waiting behind others (not running yet). */
     fun isWaiting(promptId: String): Boolean {
         val queue = JSONObject(request("/queue").decodeToString())
         return contains(queue.optJSONArray("queue_pending"), promptId)
     }
 
-    fun download(image: OutputImage): ByteArray {
-        fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
-        return request("/view?filename=${enc(image.filename)}&subfolder=${enc(image.subfolder)}&type=${enc(image.type)}")
+    fun download(image: OutputImage): ByteArray =
+        request("/view?filename=${enc(image.filename)}&subfolder=${enc(image.subfolder)}&type=${enc(image.type)}")
+
+    // The studio's "Swap face" node: with several faces in a picture it waits for a choice.
+
+    /** Questions [promptId] is waiting on: which face to replace. */
+    fun faceQuestions(promptId: String): List<FaceQuestion> {
+        val list = JSONArray(request("/studio/faces/pending?prompt_id=${enc(promptId)}").decodeToString())
+        return List(list.length()) { i ->
+            val q = list.getJSONObject(i)
+            val faces = q.getJSONArray("faces")
+            FaceQuestion(q.getString("id"), q.optInt("picture", 1), q.optInt("pictures", 1),
+                dataUrl(q.getString("image")), List(faces.length()) { dataUrl(faces.getString(it)) })
+        }
     }
+
+    /** Answers a face question: a face's number (1 = leftmost), or 0 to keep all faces. */
+    fun chooseFace(questionId: String, choice: Int) {
+        val body = JSONObject().put("id", questionId).put("choice", choice).toString().toByteArray()
+        request("/studio/faces/choose", body, "application/json")
+    }
+
+    /**
+     * Everything the app made that the PC kept (outputs/comfyui/images and thumbnails),
+     * oldest first, each with its prompt.
+     */
+    fun history(source: String = "android"): List<JSONObject> {
+        val list = JSONArray(request("/studio/history?source=${enc(source)}").decodeToString())
+        return List(list.length()) { list.getJSONObject(it) }
+    }
+
+    private fun dataUrl(url: String): android.graphics.Bitmap =
+        Images.decode(android.util.Base64.decode(url.substringAfter(","), android.util.Base64.DEFAULT))
+
+    // ComfyUI's user data store (data/comfyui/user/default/<path> on the PC): the app keeps
+    // a copy of every chat there.
+
+    /** File names in a user data folder, e.g. "chats". */
+    fun listUserData(dir: String): List<String> = try {
+        val list = JSONArray(request("/userdata?dir=${enc(dir)}").decodeToString())
+        List(list.length()) { list.getString(it) }
+    } catch (e: ComfyException) {
+        emptyList() // the folder does not exist yet
+    }
+
+    fun readUserData(path: String): ByteArray = request("/userdata/${enc(path)}")
+
+    fun writeUserData(path: String, data: ByteArray) {
+        request("/userdata/${enc(path)}?overwrite=true", data, "application/octet-stream")
+    }
+
+    private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 
     private fun contains(items: JSONArray?, promptId: String): Boolean {
         if (items == null) return false

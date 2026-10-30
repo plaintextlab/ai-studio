@@ -1,6 +1,6 @@
 {
  "last_node_id": 32,
- "last_link_id": 32,
+ "last_link_id": 33,
  "nodes": [
   {
    "id": 1,
@@ -20,7 +20,7 @@
    "outputs": [],
    "properties": {},
    "widgets_values": [
-    "1. For each model: upload their image (from 'Character creation', or any photo where the face is clear), give a name, and describe body and clothes (paste the Body and Clothes text from 'Character creation'). Model 1 is on the LEFT of the picture, Model 2 on the RIGHT.\n2. Describe the action and the camera angle.\n3. Optional: to copy the poses from a reference photo, right-click the green 'Action reference' group > Bypass Group Nodes (turns it on), and load the photo. Put the person on the left of the photo in Model 1's place.\n4. Queue. Two variations are saved as outputs/comfyui/pose_scenes/<Name1>_<Name2>_00001_.png\n\nFaces go on the two main people (the largest faces), so people in the background keep theirs. To keep a model's generated face (no photo of them), set their 'swap' to no in 'Swap faces'. The swap needs a visible face: if one is turned away, try another seed or ask for it in the camera text (e.g. 'both faces visible')."
+    "1. For each model: upload their image (from 'Character creation', or any photo where the face is clear), give a name, and describe body and clothes (paste the Body and Clothes text from 'Character creation'). Model 1 is on the LEFT of the picture, Model 2 on the RIGHT.\n2. Describe the action and the camera angle.\n3. Optional: to copy the poses from a reference photo, right-click the green 'Action reference' group > Bypass Group Nodes (turns it on), and load the photo. Put the person on the left of the photo in Model 1's place.\n4. Queue. Two variations are saved, each in its own folder with its prompt (prompt.txt), as outputs/comfyui/pose_scenes/<Name1>_<Name2>_00001/\n\nFaces go on the two main people (the largest faces), so people in the background keep theirs. To keep a model's generated face (no photo of them), set their 'swap' to no in 'Swap faces'. The swap needs a visible face: if one is turned away, try another seed or ask for it in the camera text (e.g. 'both faces visible')."
    ],
    "title": "How to use",
    "color": "#432",
@@ -487,7 +487,8 @@
      "type": "STRING",
      "slot_index": 0,
      "links": [
-      10
+      10,
+      33
      ]
     }
    ],
@@ -1269,7 +1270,7 @@
   },
   {
    "id": 32,
-   "type": "SaveImage",
+   "type": "StudioSaveImageWithPrompt",
    "pos": [
     3020,
     0
@@ -1294,18 +1295,19 @@
      "widget": {
       "name": "filename_prefix"
      }
-    }
-   ],
-   "outputs": [
+    },
     {
-     "name": "images",
-     "type": "IMAGE",
-     "slot_index": 0,
-     "links": []
+     "name": "prompt_text",
+     "type": "STRING",
+     "link": 33,
+     "widget": {
+      "name": "prompt_text"
+     }
     }
    ],
+   "outputs": [],
    "properties": {
-    "Node name for S&R": "SaveImage"
+    "Node name for S&R": "StudioSaveImageWithPrompt"
    },
    "title": "Scene",
    "widgets_values": [
@@ -1568,6 +1570,14 @@
    0,
    32,
    1,
+   "STRING"
+  ],
+  [
+   33,
+   13,
+   0,
+   32,
+   2,
    "STRING"
   ]
  ],

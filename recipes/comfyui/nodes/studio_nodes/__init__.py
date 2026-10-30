@@ -6,6 +6,11 @@ numbers every face it detects, so in a scene with people in the background its
 (the largest ones, as many as there are models), orders those left to right, and then
 runs ReActor's own swap on each of them, image by image.
 
+Swap face (faces.py): one face is replaced right away; with several, it asks which one
+(a dialog in ComfyUI's page, web/faces.js, or the phone app).
+
+Save image with its prompt (saving.py): each image in its own folder with prompt.txt.
+
 Pick model (model_picker.py): chooses the specialist model for a prompt.
 """
 import sys
@@ -94,5 +99,10 @@ class SwapMainFaces:
 
 from .model_picker import NODE_CLASS_MAPPINGS as _PICK, NODE_DISPLAY_NAME_MAPPINGS as _PICK_NAMES
 
-NODE_CLASS_MAPPINGS = {"StudioSwapMainFaces": SwapMainFaces, **_PICK}
-NODE_DISPLAY_NAME_MAPPINGS = {"StudioSwapMainFaces": "Swap main faces (left to right)", **_PICK_NAMES}
+from .faces import NODE_CLASS_MAPPINGS as _FACES, NODE_DISPLAY_NAME_MAPPINGS as _FACES_NAMES
+from .saving import NODE_CLASS_MAPPINGS as _SAVE, NODE_DISPLAY_NAME_MAPPINGS as _SAVE_NAMES
+
+NODE_CLASS_MAPPINGS = {"StudioSwapMainFaces": SwapMainFaces, **_PICK, **_FACES, **_SAVE}
+NODE_DISPLAY_NAME_MAPPINGS = {"StudioSwapMainFaces": "Swap main faces (left to right)", **_PICK_NAMES,
+                              **_FACES_NAMES, **_SAVE_NAMES}
+WEB_DIRECTORY = "./web"

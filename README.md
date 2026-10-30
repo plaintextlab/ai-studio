@@ -41,11 +41,13 @@ ComfyUI models go in `models/comfyui/<type>/` (e.g. checkpoints from Civitai in
 `models/comfyui/checkpoints`, LoRAs in `models/comfyui/loras`); press R in the UI to rescan.
 
 ComfyUI comes with these workflows (`recipes/comfyui/workflows`, copied into its
-workflow list on first start; your edits are kept):
+workflow list on first start; your edits are kept). The studio's workflows save each
+image in a folder of its own, with a `prompt.txt` holding the prompt it was made with
+(and the enhanced prompt, the negative prompt and the model, where there are any):
 
 - **1 - Character creation**: a name, the body and the clothes in separate boxes, and a
   face photo; makes a full-body picture of that character, saved as
-  `outputs/comfyui/models/<name>`.
+  `outputs/comfyui/models/<name>_00001/`.
 - **2 - Pose scene**: two characters (Model 1 on the left, Model 2 on the right), each
   with their image (for the face) and a description of body and clothes (paste it from
   Character creation), plus what they do and the camera angle. Z-Image Turbo draws the
@@ -54,7 +56,7 @@ workflow list on first start; your edits are kept):
   main people are the largest faces, so people in the background keep theirs; set a
   model's swap to no to keep a generated face). Optionally copies the poses from a reference photo
   (switch on the green group; Z-Image's pose ControlNet). Makes two variations per run in
-  `outputs/comfyui/pose_scenes/<name1>_<name2>`.
+  `outputs/comfyui/pose_scenes/<name1>_<name2>_00001/`.
 - **3 - Quick image**: the easy one, like Grok. Write a prompt and queue for new
   images; or turn on "Edit an image", load a picture and say what to change ("make it
   night", "give him a red jacket"). The studio's **Pick model** node chooses the model
@@ -63,9 +65,22 @@ workflow list on first start; your edits are kept):
   Klein 4B for edits and everything else; or pick one yourself. A **prompt enhancer**
   (Qwen3-4B, running locally) first rewrites a rough prompt into a detailed one, keeping
   what you asked for; "Prompt used" shows it. Edit requests become a precise
-  instruction that also keeps the rest of the picture unchanged. Saved in `outputs/comfyui/images`, named
-  after the model. For a newer Lustify (e.g. ZENITH from Civitai, which needs a login),
+  instruction that also keeps the rest of the picture unchanged. To put a face on the
+  person, turn on "Change the face" and load a photo of it: the studio's **Swap face**
+  node replaces the only face right away; when the picture has several, the picture is
+  made first and a window shows the faces it found, numbered, and asks which one to
+  replace (or to keep them all). Saved in `outputs/comfyui/images/<model>_00001/`.
+  For a newer Lustify (e.g. ZENITH from Civitai, which needs a login),
   put its file in `models/comfyui/checkpoints`: the newest one there is used.
+- **4 - YouTube thumbnail**: say what the video is about and type the words for the
+  thumbnail; Z-Image Turbo (the studio's model that renders text best) makes a 1280x720
+  thumbnail with the words exactly as typed, after the studio's thumbnail writer
+  (Qwen3-4B) has turned the idea into a bold, high-contrast design. Optional face, as in
+  Quick image. Saved in `outputs/comfyui/thumbnails`.
+- **5 - Prompt chat**: one question to the studio's assistant (Qwen3.5-4B, running
+  locally), e.g. to describe a character or write a prompt; it can also look at a
+  picture (switch on the green group). The phone app's Chat tab keeps whole
+  conversations.
 - **Prompt to Image Generation WF** (Z-Image Turbo) and **checkpoint_workflow** (SDXL
   with face swap and a pose variation section).
 
@@ -97,6 +112,9 @@ downloads its own models into `models/comfyui/annotators` on first use.
 
 Custom nodes the studio installs are pinned in `recipes/comfyui/recipe.sh`
 (`APP_CUSTOM_NODES`); ones you add yourself go in `data/comfyui/custom_nodes`.
+
+The studio also has an Android app for ComfyUI (Quick image, thumbnails and chat, with
+the history of everything made on the phone): see [android/README.md](android/README.md).
 
 To use an app from a phone or tablet on the same Wi-Fi, start it with `--lan`
 (e.g. `./studio.sh start facefusion --lan`) and open the printed `http://<pc-ip>:<port>/`
