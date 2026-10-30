@@ -21,6 +21,10 @@ The chip next to the shapes sets how many images each request makes (1 to 6, mad
 together on the PC). The **↻** button under a result asks for the same thing again: the
 same prompt, picture, face and number of images, with new results.
 
+The model chip (**Auto** at first) chooses the model for new images; its menu says what
+each one is best at. Auto picks one per prompt as described above; the choice is
+remembered, and **↻** uses the same model again. Edits always use FLUX.2 Klein.
+
 The face button picks a face photo, used until you remove it and remembered between
 launches. With one face in a picture it is put on that person. With several, the app
 shows the picture with its faces numbered and asks which one to replace (or to keep them

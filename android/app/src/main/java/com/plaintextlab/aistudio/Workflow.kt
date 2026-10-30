@@ -46,11 +46,11 @@ object Workflow {
      * detailed scene for new images, a precise instruction for edits).
      * [faceImage]: name of an uploaded face photo to put in, or null. With several faces in a
      * picture the server asks which one (see [ComfyClient.faceQuestions]).
-     * [count]: images per run.
+     * [count]: images per run. [model]: the Pick model choice ("Auto" picks from the prompt).
      */
     fun build(
         prompt: String, width: Int, height: Int, editImage: String?, seed: Long, enhance: Boolean,
-        faceImage: String?, count: Int,
+        faceImage: String?, count: Int, model: String = "Auto",
     ): JSONObject {
         val w = JSONObject()
         fun node(id: String, type: String, vararg inputs: Pair<String, Any>) {
@@ -64,7 +64,7 @@ object Workflow {
         // 4 positive (the enhanced prompt when enhancing), 5 negative, 6 label. It only
         // asks the enhancer (35, sharing Z-Image's Qwen3-4B) for text when it will use it.
         node("30", "StudioPickModel", "prompt" to prompt, "negative" to NEGATIVE,
-            "editing" to (editImage != null), "model" to "Auto", "enhance" to enhance,
+            "editing" to (editImage != null), "model" to model, "enhance" to enhance,
             "enhanced_prompt" to link("35"))
         node("35", "StudioEnhancePrompt", "clip" to link("41"), "prompt" to prompt, "editing" to (editImage != null))
         node(PROMPT_USED_NODE, "PreviewAny", "source" to link("30", 4))

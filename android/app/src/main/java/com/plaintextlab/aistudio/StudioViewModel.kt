@@ -23,6 +23,23 @@ enum class Shape(val label: String, val width: Int, val height: Int) {
     Thumbnail("16:9", 1280, 720),
 }
 
+/**
+ * The model for new images ([server] is its name in the studio's Pick model node). Auto lets
+ * the PC pick from the prompt; edits always use FLUX.2 Klein, the only one that edits.
+ */
+enum class ImageModel(val label: String, val short: String, val server: String, val bestFor: String) {
+    Auto("Auto", "Auto", "Auto",
+        "Picks for each prompt: Z-Image for people, Lustify for adult content, Animagine for anime, Klein for the rest"),
+    Klein("FLUX.2 Klein", "Klein", "FLUX.2 Klein",
+        "Scenes, landscapes, objects, food and products, with fine detail"),
+    ZImage("Z-Image Turbo", "Z-Image", "Z-Image Turbo",
+        "Realistic photos of people, also groups together; the best at words in a picture"),
+    Lustify("Lustify", "Lustify", "Lustify (adult)",
+        "Realistic explicit adult content"),
+    Animagine("Animagine", "Animagine", "Animagine (anime)",
+        "Anime, manga and illustration"),
+}
+
 /** The image tabs: Quick image, and YouTube thumbnails. */
 enum class Mode { Image, Thumbnail }
 
@@ -57,6 +74,8 @@ data class Turn(
     val count: Int = 1,
     /** Set while the PC waits to be told which face to replace. */
     val question: FaceQuestion? = null,
+    /** The model asked for (new images). */
+    val model: ImageModel = ImageModel.Auto,
 ) {
     enum class State { Waiting, Working, Done, Failed }
 }
@@ -73,6 +92,9 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         private set
     /** Images per request. */
     var count by mutableStateOf(prefs.getInt("count", 1).coerceIn(IMAGE_COUNTS))
+        private set
+    /** Model for new images. */
+    var model by mutableStateOf(ImageModel.entries.firstOrNull { it.name == prefs.getString("model", null) } ?: ImageModel.Auto)
         private set
     val turns = mutableStateListOf<Turn>()
     val thumbnailTurns = mutableStateListOf<Turn>()
@@ -135,6 +157,11 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     fun updateCount(n: Int) {
         count = n.coerceIn(IMAGE_COUNTS)
         prefs.edit().putInt("count", count).apply()
+    }
+
+    fun updateModel(m: ImageModel) {
+        model = m
+        prefs.edit().putString("model", m.name).apply()
     }
 
     suspend fun testServer(url: String): String = withContext(Dispatchers.IO) {
@@ -200,7 +227,8 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun send(prompt: String) {
-        val turn = Turn(newId(), Mode.Image, prompt.trim(), attachment, face, shape, Turn.State.Waiting, count = count)
+        val turn = Turn(newId(), Mode.Image, prompt.trim(), attachment, face, shape, Turn.State.Waiting, count = count,
+            model = if (attachment == null) model else ImageModel.Auto)
         attachment = null
         turns += turn
         run(turn)
@@ -213,10 +241,10 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         run(turn)
     }
 
-    /** "Again": the same request (prompt, picture, face, shape, count) as a new one, with a new seed. */
+    /** "Again": the same request (prompt, picture, face, shape, count, model) as a new one, with a new seed. */
     fun again(turn: Turn) {
         val copy = Turn(newId(), turn.mode, turn.prompt, turn.input, turn.face, turn.shape, Turn.State.Waiting,
-            text = turn.text, count = turn.count)
+            text = turn.text, count = turn.count, model = turn.model)
         turnsFor(turn.mode) += copy
         run(copy)
     }
@@ -280,7 +308,8 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         val workflow = if (turn.mode == Mode.Thumbnail) {
             Workflow.buildThumbnail(turn.prompt, turn.text, seed, enhance, faceName, turn.count)
         } else {
-            Workflow.build(turn.prompt, turn.shape.width, turn.shape.height, inputName, seed, enhance, faceName, turn.count)
+            Workflow.build(turn.prompt, turn.shape.width, turn.shape.height, inputName, seed, enhance, faceName, turn.count,
+                turn.model.server)
         }
         val id = comfy.queue(workflow, clientId)
         val finished = comfy.await(id) { waiting ->

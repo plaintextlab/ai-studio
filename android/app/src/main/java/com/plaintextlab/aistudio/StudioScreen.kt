@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Download
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TextFields
@@ -53,6 +55,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -476,7 +479,7 @@ private fun InputBar(
                     }
                 }
             }
-            // Shape (new images only) and how many images per run.
+            // Shape and model (new images only), and how many images per run.
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -492,6 +495,7 @@ private fun InputBar(
                 } else {
                     Spacer(Modifier.weight(1f))
                 }
+                if (!thumbnail && attachment == null) ModelChip(vm.model, vm::updateModel)
                 CountChip(vm.count, vm::updateCount)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -525,6 +529,42 @@ private fun InputBar(
                 FilledIconButton(onClick = onSend, enabled = text.isNotBlank() && vm.server.isNotBlank()) {
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Create")
                 }
+            }
+        }
+    }
+}
+
+/** The model for new images; the menu says what each one is best at. */
+@Composable
+private fun ModelChip(model: ImageModel, onChange: (ImageModel) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        AssistChip(
+            onClick = { open = true },
+            label = { Text(model.short) },
+            leadingIcon = { Icon(Icons.Filled.Palette, contentDescription = "Model", modifier = Modifier.size(18.dp)) },
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.widthIn(max = 320.dp)) {
+            Text("Model for new images (edits always use FLUX.2 Klein)",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            HorizontalDivider()
+            ImageModel.entries.forEach { m ->
+                DropdownMenuItem(
+                    text = {
+                        Column(Modifier.padding(vertical = 4.dp)) {
+                            Text(m.label, style = MaterialTheme.typography.bodyLarge)
+                            Text(m.bestFor, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    },
+                    leadingIcon = {
+                        if (m == model) Icon(Icons.Filled.Check, contentDescription = "Selected")
+                        else Spacer(Modifier.size(24.dp))
+                    },
+                    onClick = { onChange(m); open = false },
+                )
             }
         }
     }
